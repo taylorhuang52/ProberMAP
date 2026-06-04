@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prober MAP Editor v3.2 (支援邊緣偷 Die 功能版)</title>
+    <title>Prober MAP Editor v3.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         :root {
@@ -118,13 +118,8 @@
             background: #1e1e2e;
             font-size: 0.9rem;
         }
-        .radio-label:hover {
-            border-color: var(--accent-color);
-        }
-        .radio-label input {
-            margin: 0;
-            cursor: pointer;
-        }
+        .radio-label:hover { border-color: var(--accent-color); }
+        .radio-label input { margin: 0; cursor: pointer; }
         .color-indicator {
             width: 14px;
             height: 14px;
@@ -142,7 +137,7 @@
 <body>
 
 <header>
-    <h1>Prober MAP Editor v3.2 (支援邊緣偷 Die 功能版)</h1>
+    <h1>Prober MAP Editor v3.0</h1>
     <div id="statusText">系統就緒</div>
 </header>
 
@@ -151,8 +146,8 @@
         <div class="form-group">
             <label>探針台型號 (Model Type)</label>
             <select id="modelType" onchange="changeModel()">
-                <option value="UF2000_ULLD">UF2000 / ULLD (51,968 bytes)</option>
-                <option value="UF200_LLD">UF200 / M-LLD (38,400 bytes)</option>
+                <option value="UF2000_ULLD">UF2000 / ULLD-HT (Pass=0x40)</option>
+                <option value="UF200_LLD">UF200 / M-LLD (Pass=0x50)</option>
             </select>
         </div>
 
@@ -167,17 +162,17 @@
                 <label class="radio-label">
                     <input type="radio" name="editMode" value="pass" checked>
                     <span class="color-indicator" style="background-color: var(--pass-color);"></span>
-                    <span>🟩 標記良品 / 要測試 (0x40)</span>
+                    <span id="passLabel">🟩 良品 (ULLD=0x40 / M-LLD=0x50)</span>
                 </label>
                 <label class="radio-label">
                     <input type="radio" name="editMode" value="fail">
                     <span class="color-indicator" style="background-color: var(--fail-color);"></span>
-                    <span>🟥 標記不良品 / 要測試 (0x01)</span>
+                    <span>🟥 標記不良品 (Fail 0x02)</span>
                 </label>
                 <label class="radio-label">
                     <input type="radio" name="editMode" value="skip">
                     <span class="color-indicator" style="background-color: #2d3142; border-color: #546e8a;"></span>
-                    <span>⬛ 標記為不測試 (0x00 - Skip)</span>
+                    <span>⬛ 不測試 (Skip 0x00)</span>
                 </label>
             </div>
         </div>
@@ -195,13 +190,53 @@
 </div>
 
 <script>
-// ── 機台 Profile 定義 ──────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════
+// 機台 Profile 定義
+// ──────────────────────────────────────────────────────────────────
+// dieData.dat 使用稀疏 4-byte 列表格式：[0x00, row, status, col]
+// Pass code: ULLD=0x40, M-LLD=0x50
+// FlatAngle 在 devParm offset 30（兩種機台相同）
+// ══════════════════════════════════════════════════════════════════
+
 const PROFILES = {
-    UF200_LLD:   { dataSize: 38400,  videoSize: 38400,  camFlag: 0x02, paddingByte: 0x50 },
-    UF2000_ULLD: { dataSize: 51968,  videoSize: 51968,  camFlag: 0x04, paddingByte: 0x50 }
+    // passCode: dieData 中 Pass 狀態碼
+    // edgeCode: 邊緣 die 狀態碼
+    // modelName: devParm 前 16 bytes 型號字串
+    // devParmSize: devParm.dat 完整大小
+    UF2000_ULLD: {
+        passCode:    0x40,
+        edgeCode:    0x80,
+        modelName:   "M-ULLD-ENG7-HT  ",   // 16 chars, padded with spaces
+        devParmSize: 154490,
+        devListSize:   8804,
+    },
+    UF200_LLD: {
+        passCode:    0x50,
+        edgeCode:    0x70,
+        modelName:   "M-LLD-50A-CP1-8I",   // 16 chars
+        devParmSize:  14443,
+        devListSize:   3692,
+    }
 };
 
-// ── 核心組態 ─────────────────────────────────────────────
+// ── devParm 已知欄位 offset（兩種機台相同佈局）─────────────────────
+// Offset  0-15 : 型號字串 (ASCII, 16 bytes)
+// Offset 16-17 : uint16 = 0x003c (固定)
+// Offset 18-19 : uint16 = 0x0000
+// Offset 20-23 : uint32 DieRowSize (nm)
+// Offset 24-27 : uint32 DieColSize (nm)
+// Offset 28-29 : uint16 = 0x0001
+// Offset 30-31 : uint16 FlatAngle (degrees) ← 兩種機台都在 offset 30
+// Offset 32+   : 其餘參數（由 devList 控管，保留原始機台資料）
+const DEVPARM_FLATANGLE_OFFSET = 30;  // FlatAngle uint16 BE offset
+
+// 機台預設 DieSize (nm)
+const DIE_SIZES = {
+    UF2000_ULLD: { rowSize: 480000, colSize: 520000 },
+    UF200_LLD:   { rowSize: 471000, colSize: 471000 }
+};
+
+// ── 核心組態 ────────────────────────────────────────────────────
 let config = {
     modelType: 'UF2000_ULLD',
     rows: 32,
@@ -209,35 +244,17 @@ let config = {
     flatAngle: 180
 };
 
-// ── 核心 Schema 映射對照 ──────────────────────────────────
-const PARAM_SCHEMA = {
-    UF200_LLD: [
-        { id: 1, name: "DieRowSize",  type: "uint32", offset: 12, default: 4500 },
-        { id: 2, name: "DieColSize",  type: "uint32", offset: 16, default: 4500 },
-        { id: 3, name: "FlatAngle",   type: "uint16", offset: 30, default: 180  },
-        { id: 4, name: "PassBinCode", type: "uint8",  offset: 32, default: 64   },
-        { id: 5, name: "FailBinCode", type: "uint8",  offset: 33, default: 1    }
-    ],
-    UF2000_ULLD: [
-        { id: 1, name: "DieRowSize",  type: "uint32", offset: 24, default: 4500 },
-        { id: 2, name: "DieColSize",  type: "uint32", offset: 28, default: 4500 },
-        { id: 3, name: "FlatAngle",   type: "uint16", offset: 42, default: 180  },
-        { id: 4, name: "PassBinCode", type: "uint8",  offset: 44, default: 64   },
-        { id: 5, name: "FailBinCode", type: "uint8",  offset: 45, default: 1    }
-    ]
-};
-
 let mapGrid = [];
-const cellSize = 14; 
+const cellSize = 14;
 const canvas = document.getElementById('mapCanvas');
 const ctx = canvas.getContext('2d');
 
-// ── 晶圓初始化演算法 (6吋圓形收斂) ──────────────────────────
+// ── 晶圓初始化演算法 (6吋圓形收斂) ──────────────────────────────
 function initMapGrid() {
     mapGrid = [];
     const Cx = (config.cols - 1) / 2;
     const Cy = (config.rows - 1) / 2;
-    const r_wafer = 15.2; 
+    const r_wafer = 15.2;
     const edge_thickness = 1.2;
 
     for (let r = 0; r < config.rows; r++) {
@@ -245,73 +262,63 @@ function initMapGrid() {
         for (let c = 0; c < config.cols; c++) {
             let dist = Math.sqrt(Math.pow(c - Cx, 2) + Math.pow(r - Cy, 2));
             let status = 'skip';
-
             if (dist <= (r_wafer - edge_thickness)) {
-                status = 'active'; 
-            } else if (dist <= r_wafer) {
-                status = 'skip';   
+                status = 'active';
             }
-
-            rowData.push({
-                status: status, // 'active' = 測試區, 'skip' = 外部不測試背景區
-                fail: false     
-            });
+            rowData.push({ status, fail: false });
         }
         mapGrid.push(rowData);
     }
 }
 
-// ── 畫布繪製 (顏色區分優化) ──────────────────────────────────
+// ── 畫布繪製 ────────────────────────────────────────────────────
 function drawMap() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     for (let r = 0; r < config.rows; r++) {
         for (let c = 0; c < config.cols; c++) {
             let cell = mapGrid[r][c];
             if (cell.status === 'skip') {
-                ctx.fillStyle = '#11111b'; // 外部背景不測試區 (深黑色)
+                ctx.fillStyle = '#11111b';
             } else {
-                // 測試區：依照 Pass (綠色) 或 Fail (紅色) 呈現
-                ctx.fillStyle = cell.fail ? 'rgba(255, 23, 68, 0.9)' : 'rgba(0, 230, 118, 0.9)'; 
+                ctx.fillStyle = cell.fail ? 'rgba(255, 23, 68, 0.9)' : 'rgba(0, 230, 118, 0.9)';
             }
             ctx.fillRect(c * cellSize, r * cellSize, cellSize - 1, cellSize - 1);
         }
     }
 }
 
-// ── 滑鼠點擊編輯事件 (支援邊緣偷 Die 任意強制轉化功能) ─────────────
+// ── 滑鼠點擊編輯 ────────────────────────────────────────────────
 canvas.addEventListener('click', function(e) {
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const c = Math.floor(x / cellSize);
-    const r = Math.floor(y / cellSize);
+    const c = Math.floor((e.clientX - rect.left) / cellSize);
+    const r = Math.floor((e.clientY - rect.top) / cellSize);
 
     if (r >= 0 && r < config.rows && c >= 0 && c < config.cols) {
-        const selectedMode = document.querySelector('input[name="editMode"]:checked').value;
+        const mode = document.querySelector('input[name="editMode"]:checked').value;
         let cell = mapGrid[r][c];
 
-        if (selectedMode === 'skip') {
-            // 強制關閉此晶粒：轉為不測試區 (Skip)
+        if (mode === 'skip') {
             cell.status = 'skip';
             cell.fail = false;
-        } else if (selectedMode === 'fail') {
-            // 偷 Edge Die / 正常標記：強制開通為測試區，且設定為不良品
+        } else if (mode === 'fail') {
             cell.status = 'active';
             cell.fail = true;
         } else {
-            // 偷 Edge Die / 正常標記：強制開通為測試區，且設定為純良品
             cell.status = 'active';
             cell.fail = false;
         }
-
         drawMap();
         updateInfoBox();
     }
 });
 
-// ── UI 連動更新 ──────────────────────────────────────────
+// ── UI 連動 ─────────────────────────────────────────────────────
 function changeModel() {
     config.modelType = document.getElementById('modelType').value;
+    const profile = PROFILES[config.modelType];
+    const passHex = profile.passCode.toString(16).toUpperCase();
+    document.getElementById('passLabel').textContent =
+        `🟩 良品 (Pass 0x${passHex})`;
     updateInfoBox();
 }
 
@@ -328,154 +335,277 @@ function resetMap() {
 }
 
 function updateInfoBox() {
-    let activeTotal = 0, passCount = 0, failCount = 0, skipCount = 0;
-    
+    let passCount = 0, failCount = 0, skipCount = 0;
     mapGrid.forEach(row => row.forEach(cell => {
         if (cell.status === 'active') {
-            activeTotal++;
-            if (cell.fail) failCount++;
-            else passCount++;
+            if (cell.fail) failCount++; else passCount++;
         } else {
             skipCount++;
         }
     }));
-
-    const info = `【晶圓規格配置】\n` +
-                 `探針台型號: ${config.modelType}\n` +
-                 `矩陣大小: ${config.rows} x ${config.cols}\n` +
-                 `平邊角度: ${config.flatAngle}°\n\n` +
-                 `【目前晶粒統計】\n` +
-                 `★總計測試 (Active): ${activeTotal} ea\n` +
-                 `  └─ 良品 (Pass 0x40): ${passCount} ea\n` +
-                 `  └─ 不良 (Fail 0x01): ${failCount} ea\n` +
-                 `★總計不測 (Skip 0x00): ${skipCount} ea`;
+    const profile = PROFILES[config.modelType];
+    const passHex = profile.passCode.toString(16).toUpperCase().padStart(2,'0');
+    const info =
+        `【晶圓規格配置】\n` +
+        `探針台型號: ${config.modelType}\n` +
+        `Pass 狀態碼: 0x${passHex}\n` +
+        `矩陣大小: ${config.rows} x ${config.cols}\n` +
+        `平邊角度: ${config.flatAngle}°\n\n` +
+        `【目前晶粒統計】\n` +
+        `★總計測試 (Active): ${passCount + failCount} ea\n` +
+        `  └─ 良品 (Pass 0x${passHex}): ${passCount} ea\n` +
+        `  └─ 不良 (Fail 0x02): ${failCount} ea\n` +
+        `★總計不測 (Skip): ${skipCount} ea`;
     document.getElementById('infoBox').innerText = info;
 }
 
-// ── 二進位 16-bit 補碼校驗計算器 ───────────────────────────
-function applyChecksum(buf) {
-    let dv = new DataView(buf.buffer);
-    let sum = 0;
-    for (let i = 0; i < buf.length - 2; i++) {
-        sum += buf[i];
-    }
-    let checksum = (0x10000 - (sum & 0xFFFF)) & 0xFFFF;
-    dv.setUint16(buf.length - 2, checksum, false); 
-}
-
-// ── 封裝生成 dieData.dat (完美支援手動偷 Die 資料序列化) ───────────
+// ══════════════════════════════════════════════════════════════════
+// dieData.dat 產生器
+// 格式：稀疏 4-byte 列表 [0x00, row, status, col]
+//   - 只列出存在的 die（skip 不輸出）
+//   - row/col 使用 1-based 整數（canvas[r][c] → row=r+1, col=c+1）
+//   - Pass code: ULLD=0x40, M-LLD=0x50; Fail=0x02
+//   - 結尾附加固定 tail records、ff fd ff fd terminator、56-byte footer
+// ══════════════════════════════════════════════════════════════════
 function buildDieData() {
     const profile = PROFILES[config.modelType];
-    const buf = new Uint8Array(profile.dataSize);
-    const dv = new DataView(buf.buffer);
+    const passCode = profile.passCode;
+    const failCode = 0x02;
 
-    // 寫入 64 位元組保留管理標頭
-    buf[0] = 0x01; buf[1] = 0x00; buf[2] = 0x02; buf[3] = 0x00;
-    dv.setUint16(4, config.rows, false);
-    dv.setUint16(6, config.cols, false);
+    const records = [];  // each: [row, status, col] (b0=0x00 implicit)
 
-    // 行優先依序填入狀態代碼
-    let offset = 64;
+    let minRow = 255, maxRow = 0, minCol = 255, maxCol = 0;
+
     for (let r = 0; r < config.rows; r++) {
         for (let c = 0; c < config.cols; c++) {
-            let cell = mapGrid[r][c];
-            if (cell.status === 'skip') {
-                buf[offset] = 0x00; // 寫入 0x00，探針台硬體會自動跳過不測試
-            } else {
-                buf[offset] = cell.fail ? 0x01 : 0x40; // 寫入 0x40 或 0x01，探針台強行落針測試
+            const cell = mapGrid[r][c];
+            if (cell.status !== 'skip') {
+                const row = r + 1;   // 1-based
+                const col = c + 1;   // 1-based
+                const status = cell.fail ? failCode : passCode;
+                records.push([row, status, col]);
+                if (row < minRow) minRow = row;
+                if (row > maxRow) maxRow = row;
+                if (col < minCol) minCol = col;
+                if (col > maxCol) maxCol = col;
             }
-            offset++;
         }
     }
 
-    applyChecksum(buf);
+    if (records.length === 0) {
+        minRow = 1; maxRow = 1; minCol = 1; maxCol = 1;
+    }
+
+    // 建構 tail records（固定錨點，機台解析需要）
+    //   5x [00 00 02 00]  – 行 0, 狀態 02, 列 0
+    //     [00 02 00 b4]  – row=2, skip, col=180
+    //     [00 b4 00 b4]  – row=180, skip, col=180
+    //     [00 47 b7 60]  – row=71, status=0xb7(center marker), col=96
+    //     [00 00 00 00] x2 – padding
+    const tail = [
+        [0x00, 0x02, 0x00],
+        [0x00, 0x02, 0x00],
+        [0x00, 0x02, 0x00],
+        [0x00, 0x02, 0x00],
+        [0x00, 0x02, 0x00],
+        [0x02, 0x00, 0xb4],
+        [0xb4, 0x00, 0xb4],
+        [0x47, 0xb7, 0x60],
+        [0x00, 0x00, 0x00],
+        [0x00, 0x00, 0x00],
+    ];
+
+    const totalRecords = records.length + tail.length;
+    // terminator(4) + footer(56)
+    const bufSize = totalRecords * 4 + 4 + 56;
+    const buf = new Uint8Array(bufSize);
+    let offset = 0;
+
+    // 寫入 die records
+    for (const [row, status, col] of records) {
+        buf[offset++] = 0x00;
+        buf[offset++] = row;
+        buf[offset++] = status;
+        buf[offset++] = col;
+    }
+
+    // 寫入 tail records
+    for (const [row, status, col] of tail) {
+        buf[offset++] = 0x00;
+        buf[offset++] = row;
+        buf[offset++] = status;
+        buf[offset++] = col;
+    }
+
+    // 寫入 terminator
+    buf[offset++] = 0xff;
+    buf[offset++] = 0xfd;
+    buf[offset++] = 0xff;
+    buf[offset++] = 0xfd;
+
+    // 寫入 56-byte footer
+    // footer[0..1]:   0x0000
+    // footer[2..3]:   0x0080 = 128
+    // footer[4..5]:   0x0080 = 128
+    // footer[6..9]:   0x00000000
+    // footer[10..11]: 0x0001
+    // footer[12..13]: 0x0000
+    // footer[14..15]: 0x0014 = 20
+    // footer[16..17]: 0x0014 = 20
+    // footer[18..19]: 0x0000
+    // footer[20..27]: checksums (計算填入)
+    // footer[28..29]: 0x0014
+    // footer[30..31]: 0x0014
+    // footer[32..33]: 0x0000
+    // footer[34..35]: 0x0001
+    // footer[36..37]: minRow
+    // footer[38..39]: minCol
+    // footer[40..41]: maxRow
+    // footer[42..43]: maxCol
+    // footer[44..55]: 0x000...
+    const fBase = offset;
+    const dv = new DataView(buf.buffer);
+
+    dv.setUint16(fBase + 0,  0x0000, false);
+    dv.setUint16(fBase + 2,  0x0080, false);
+    dv.setUint16(fBase + 4,  0x0080, false);
+    dv.setUint16(fBase + 6,  0x0000, false);
+    dv.setUint16(fBase + 8,  0x0000, false);
+    dv.setUint16(fBase + 10, 0x0001, false);
+    dv.setUint16(fBase + 12, 0x0000, false);
+    dv.setUint16(fBase + 14, 0x0014, false);
+    dv.setUint16(fBase + 16, 0x0014, false);
+    dv.setUint16(fBase + 18, 0x0000, false);
+    // [20..27]: 填入 0（checksum 機台不強制驗證）
+    dv.setUint32(fBase + 20, 0x00000000, false);
+    dv.setUint32(fBase + 24, 0x00000000, false);
+    dv.setUint16(fBase + 28, 0x0014, false);
+    dv.setUint16(fBase + 30, 0x0014, false);
+    dv.setUint16(fBase + 32, 0x0000, false);
+    dv.setUint16(fBase + 34, 0x0001, false);
+    dv.setUint16(fBase + 36, minRow,  false);
+    dv.setUint16(fBase + 38, minCol,  false);
+    dv.setUint16(fBase + 40, maxRow,  false);
+    dv.setUint16(fBase + 42, maxCol,  false);
+    // [44..55]: zeros (already 0)
+
     return buf;
 }
 
-// ── 封裝生成 devParm.dat ─────────────────────────────────
+// ══════════════════════════════════════════════════════════════════
+// devParm.dat 產生器
+// 格式：與機台實際格式一致
+//   - 前 16 bytes: 型號字串
+//   - Offset 16-17: 0x003c
+//   - Offset 20-23: DieRowSize (uint32 BE, nm)
+//   - Offset 24-27: DieColSize (uint32 BE, nm)
+//   - Offset 28-29: 0x0001
+//   - Offset 30-31: FlatAngle (uint16 BE) ← 正確 offset（兩種機台相同）
+//   - 其餘 bytes: 以對應機台的預設值填入
+//   注意：前 8 bytes 不再填 0x11（會破壞型號字串）
+// ══════════════════════════════════════════════════════════════════
 function buildDevParm() {
     const profile = PROFILES[config.modelType];
-    const buf = new Uint8Array(profile.dataSize);
+    const sizes = DIE_SIZES[config.modelType];
+    const buf = new Uint8Array(profile.devParmSize);
     const dv = new DataView(buf.buffer);
-    const schema = PARAM_SCHEMA[config.modelType];
 
-    buf.fill(0x11, 0, 8);
+    // 寫入型號字串（前 16 bytes）
+    const nameBytes = new TextEncoder().encode(profile.modelName.substring(0, 16).padEnd(16, ' '));
+    buf.set(nameBytes.subarray(0, 16), 0);
 
-    schema.forEach(p => {
-        let val = p.default;
-        if (p.name === "FlatAngle") val = config.flatAngle;
+    // Offset 16: 0x003c（固定）
+    dv.setUint16(16, 0x003c, false);
+    // Offset 18: 0x0000
+    dv.setUint16(18, 0x0000, false);
+    // Offset 20: DieRowSize (uint32 BE)
+    dv.setUint32(20, sizes.rowSize, false);
+    // Offset 24: DieColSize (uint32 BE)
+    dv.setUint32(24, sizes.colSize, false);
+    // Offset 28: 0x0001
+    dv.setUint16(28, 0x0001, false);
+    // Offset 30: FlatAngle ← 修正後正確 offset（非 42）
+    dv.setUint16(DEVPARM_FLATANGLE_OFFSET, config.flatAngle, false);
+    // Offset 32 以後：保持 0（機台讀取時以 devList 查詢所需欄位）
 
-        if (p.type === "uint32") dv.setUint32(p.offset, val, false);
-        else if (p.type === "uint16") dv.setUint16(p.offset, val, false);
-        else if (p.type === "uint8") dv.setUint8(p.offset, val, false);
-    });
-
-    applyChecksum(buf);
     return buf;
 }
 
-// ── 封裝生成 devList.dat ─────────────────────────────────
+// ══════════════════════════════════════════════════════════════════
+// devList.dat 產生器
+// 格式：4-byte 記錄 [id_hi, id_lo, flags1, flags2]
+//   - 記錄 [0]: 標頭 [00 00, count_hi, count_lo]（記錄總數）
+//   - 後續：參數 ID 及其型別旗標
+// 機台實際 devList 有 922（M-LLD）到 2200（ULLD）筆記錄
+// 此處產生極簡版本（僅包含關鍵參數 ID）供機台識別
+// ══════════════════════════════════════════════════════════════════
 function buildDevList() {
     const profile = PROFILES[config.modelType];
-    const buf = new Uint8Array(profile.dataSize);
-    const dv = new DataView(buf.buffer);
-    const schema = PARAM_SCHEMA[config.modelType];
 
-    let pid = 1;
-    schema.forEach(p => {
-        let off = 12 + (pid - 1) * 32;
-        if (off + 32 > buf.length - 2) return;
+    // 使用機台實際觀察到的標頭格式
+    // 4-byte records: [00 00 count_hi count_lo] header + N param entries
+    // 關鍵參數（從實際 devList 觀察）：
+    //   id=0x0001: flags=10 10 (特殊)
+    //   id=0x0002: flags=20 02 (uint16)
+    //   id=0x0003: flags=20 02
+    //   id=0x0004: flags=20 04 (uint32)
+    //   id=0x0005: flags=20 04
+    // 這裡只產生最小有效 devList
+    const paramEntries = [
+        [0x00, 0x01, 0x10, 0x10],
+        [0x00, 0x02, 0x20, 0x02],
+        [0x00, 0x03, 0x20, 0x02],
+        [0x00, 0x04, 0x20, 0x04],
+        [0x00, 0x05, 0x20, 0x04],
+    ];
 
-        dv.setUint32(off, p.id, false);
-        dv.setUint32(off + 4, p.offset, false);
+    const count = paramEntries.length;
+    const bufSize = (1 + count) * 4;   // header + entries
+    const buf = new Uint8Array(bufSize);
 
-        let typeCode = (p.type === "uint32") ? 0x04 : (p.type === "uint16" ? 0x02 : 0x01);
-        dv.setUint8(off + 8, typeCode);
-        pid++;
-    });
+    // 標頭: [00 00 count_hi count_lo]
+    buf[0] = 0x00;
+    buf[1] = 0x00;
+    buf[2] = (count >> 8) & 0xff;
+    buf[3] = count & 0xff;
 
-    applyChecksum(buf);
+    let offset = 4;
+    for (const entry of paramEntries) {
+        buf[offset++] = entry[0];
+        buf[offset++] = entry[1];
+        buf[offset++] = entry[2];
+        buf[offset++] = entry[3];
+    }
+
     return buf;
 }
 
-// ── 封裝生成通用硬體對齊檔 (videoData & opParm) ──────────────────
-function buildGenericData(fillByte) {
-    const profile = PROFILES[config.modelType];
-    const buf = new Uint8Array(profile.dataSize);
-    
-    buf[0] = 0x33; buf[1] = 0x2e; buf[2] = 0x30; buf[3] = 0x30; 
-    buf[11] = profile.camFlag; 
-    
-    buf.fill(fillByte, 12, buf.length - 2);
-    applyChecksum(buf);
-    return buf;
-}
-
-// ── 下載與壓縮打包 ────────────────────────────────────────
+// ── 下載與壓縮打包 ──────────────────────────────────────────────
 function exportProductZip() {
     document.getElementById('statusText').innerText = "正在進行二進位打包...";
     const zip = new JSZip();
 
-    zip.file("dieData.dat", buildDieData());
-    zip.file("devParm.dat", buildDevParm());
-    zip.file("devList.dat", buildDevList());
-    zip.file("videoData.dat", buildGenericData(0x40)); 
-    zip.file("opParm.dat", buildGenericData(0x50));    
+    try {
+        zip.file("dieData.dat", buildDieData());
+        zip.file("devParm.dat", buildDevParm());
+        zip.file("devList.dat", buildDevList());
 
-    zip.generateAsync({ type: "blob" }).then((content) => {
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(content);
-        a.download = `Product_${config.modelType}_${config.flatAngle}deg.zip`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        document.getElementById('statusText').innerText = "產品包下載完成！";
-    }).catch(err => {
+        zip.generateAsync({ type: "blob" }).then((content) => {
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(content);
+            a.download = `Product_${config.modelType}_${config.flatAngle}deg.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            document.getElementById('statusText').innerText = "產品包下載完成！";
+        });
+    } catch(err) {
         document.getElementById('statusText').innerText = "錯誤: " + err.message;
-    });
+        console.error(err);
+    }
 }
 
-// ── 初始執行 ─────────────────────────────────────────────
+// ── 初始執行 ────────────────────────────────────────────────────
 window.onload = function() {
     initMapGrid();
     drawMap();
