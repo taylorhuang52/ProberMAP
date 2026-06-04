@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UF200 / UF2000 晶圓地圖編輯器核心邏輯報告</title>
+    <style>
+        :root {
+            --bg-color: #0f111a;
+            --card-bg: #1e2235;
+            --text-color: #e2e8f0;
+            --accent-color: #00d4ff;
+            --accent-secondary: #ff6b35;
+            --border-color: #2d3142;
+            --code-bg: #090b11;
+        }
+        body {
+            font-family: 'Segoe UI', Arial, 'Microsoft JhengHei', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            max-width: 900px;
+            width: 100%;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 20px;
+        }
+        h1 { color: var(--accent-color); font-size: 2.2rem; margin-bottom: 10px; }
+        .subtitle { color: #a0aec0; font-size: 1.1rem; }
+        
+        /* 投影片卡片樣式 */
+        .slide-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 35px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            position: relative;
+            transition: transform 0.3s;
+        }
+        .slide-card:hover {
+            transform: translateY(-5px);
+        }
+        .slide-num {
+            position: absolute;
+            top: 20px;
+            right: 25px;
+            background-color: var(--border-color);
+            color: var(--accent-color);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            font-family: monospace;
+        }
+        h2 {
+            color: #fff;
+            font-size: 1.6rem;
+            margin-top: 0;
+            margin-bottom: 20px;
+            border-left: 5px solid var(--accent-color);
+            padding-left: 15px;
+        }
+        h3 {
+            color: var(--accent-secondary);
+            font-size: 1.1rem;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        p { line-height: 1.7; color: #cbd5e1; margin-bottom: 15px; }
+        ul { margin-top: 5px; padding-left: 25px; }
+        li { margin-bottom: 10px; line-height: 1.6; color: #cbd5e1; }
+        strong { color: var(--accent-color); }
+        
+        /* 程式碼與公式區塊 */
+        pre {
+            background-color: var(--code-bg);
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            border: 1px solid #2d3748;
+            margin: 15px 0;
+        }
+        code {
+            font-family: 'Consolas', 'Courier New', monospace;
+            color: #fbd38d;
+            font-size: 0.9rem;
+        }
+        .formula {
+            background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 1.2rem;
+            font-style: italic;
+            color: #fff;
+            margin: 15px 0;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        /* 頁尾固定導航（便於快速跳轉） */
+        .quick-nav {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(30, 34, 53, 0.9);
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: flex;
+            gap: 5px;
+            backdrop-filter: blur(5px);
+        }
+        .quick-nav a {
+            color: #fff;
+            text-decoration: none;
+            background: #2d3142;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .quick-nav a:hover {
+            background: var(--accent-color);
+            color: #111;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <header>
+        <h1>UF200 / UF2000 虛擬晶圓地圖編輯器</h1>
+        <div class="subtitle">核心演算法、二進位架構與動態資料對齊技術報告</div>
+    </header>
+
+    <div class="slide-card" id="slide1">
+        <div class="slide-num">Slide 1 / 7</div>
+        <h2>簡報首頁：系統技術架構概述</h2>
+        <p>本報告旨在解析 <strong>Prober MAP Editor v3.0</strong> 系統之底層運算邏輯，詳細說明前端如何不依賴後端編譯器，直接在瀏覽器環境下操作記憶體二進位緩衝區（ArrayBuffer），生成完全符合東京電子（TEL）系列探針台（Prober）規範之 <code>Product.zip</code> 打包產品檔。</p>
+        <h3>報告核心三大主軸：</h3>
+        <ul>
+            <li><strong>晶圓空間幾何演算法</strong>：物理格點向虛擬陣列的映射轉換與數量收斂。</li>
+            <li><strong>共享參數 Schema 技術</strong>：動態定位與多重配置防結構移位機制。</li>
+            <li><strong>工業級 Checksum 校驗碼</strong>：16-bit 雙位元組二進位補碼演算。</li>
+        </ul>
+    </div>
+
+    <div class="slide-card" id="slide2">
+        <div class="slide-num">Slide 2 / 7</div>
+        <h2>6 吋晶圓地圖空間演算法 (Wafer Space Mapping)</h2>
+        <p>為了精確模擬真實 6 吋晶圓（6-inch Wafer）之空間幾何特性，並使預設的<strong>有效測試總顆數自動收斂於正常工業範圍（500 ~ 700 ea）</strong>，系統摒棄了大矩陣設計，改採高效的二維向心收斂演算法：</p>
+        
+        <h3>1. 矩陣邊界降階</h3>
+        <p>預設網頁邊界調整為 <strong>32 x 32</strong> 矩陣。此矩陣規模在結合圓形幾何切割時，能完美產出約 600 顆左右的有效晶粒。</p>
+        
+        <h3>2. 歐幾里得距離演算</h3>
+        <p>定義矩陣虛擬中心點：<code>Cx = (32 - 1) / 2 = 15.5</code>，<code>Cy = (32 - 1) / 2 = 15.5</code>。針對陣列中的每一個網格 <code>(r, c)</code>，計算其與中心點的絕對直線距離：</p>
+        <div class="formula">Dist = √((c - Cx)² + (r - Cy)²)</div>
+        
+        <h3>3. 空間區域劃分臨界值</h3>
+        <ul>
+            <li><strong>測試區域 (Active Area)</strong>：當 <code>Dist ≤ 半徑 - 邊緣厚度 (Radius - 1.2)</code>，晶粒被判定為內部有效測試區，初始化時<strong>全部預設為良品代碼 (0x40)</strong>。</li>
+            <li><strong>邊緣無效區 (Edge Area)</strong>：當距離大於測試區但 <code>Dist ≤ 半徑</code> 時，歸類為邊緣不完整晶粒（如黃色不完全方塊）。</li>
+            <li><strong>外部跳過區 (Skip Area)</strong>：當 <code>Dist > 半徑</code>，直接歸類為不測試的空白背景（0x00）。</li>
+        </ul>
+    </div>
+
+    <div class="slide-card" id="slide3">
+        <div class="slide-num">Slide 3 / 7</div>
+        <h2>dieData.dat 狀態碼封裝與純良品初始化</h2>
+        <p><code>dieData.dat</code> 是機台執行晶圓測試（CP Test）或挑晶機（Pick & Place）讀取的核心地圖數據。本版本（v3.0）依產線實際需求進行了<strong>純良品重構</strong>：</p>
+        
+        <h3>1. 檔案大小硬性限制</h3>
+        <ul>
+            <li><strong>UF200 (Gen1 M-LLD/LLD)</strong>：二進位緩衝區大小固定為 <strong>38,400 bytes</strong>。</li>
+            <li><strong>UF2000 (Gen2 ULLD)</strong>：二進位緩衝區大小固定為 <strong>51,968 bytes</strong>。</li>
+        </ul>
+        
+        <h3>2. 純良品初始化邏輯 (移除隨機預測)</h3>
+        <p>新版程式全面移除了隨機破壞晶粒（Random Fail）的代碼。地圖初次生成時，內圈有效測試區的狀態碼<strong>全部填入 0x40</strong>，排除不確定性：</p>
+        
+        <pre><code>// 封裝時各狀態碼對應：
+0x40 -> 主動測試良品 (Active Pass Die) -> 預設全部填入此值
+0x01 -> 手動標記不良品 (Active Fail Die) -> 僅在使用者手動點擊時觸發
+0x00 -> 外部跳過不測區 (Skip Die)</code></pre>
+    </div>
+
+    <div class="slide-card" id="slide4">
+        <div class="slide-num">Slide 4 / 7</div>
+        <h2>防止結構移位的「動態 Schema 綁定技術」</h2>
+        <p>在實機架構中，參數說明檔 <code>devList.dat</code> 與數值檔 <code>devParm.dat</code> 必須在位元組層級（Byte-level）達成 100% 的絕對對齊。若發生偏離，實機會直接判定損壞（File Corrupt）。</p>
+        
+        <h3>動態綁定解決方案 (PARAM_SCHEMA)：</h3>
+        <p>系統不使用硬編碼，而是將機型結構定義在中央共享對象中：</p>
+        <pre><code>const PARAM_SCHEMA = {
+    UF200_LLD: [
+        { id: 1, name: "DieRowSize",  type: "uint32", offset: 12, default: 4500 },
+        { id: 3, name: "FlatAngle",   type: "uint16", offset: 30, default: 180  }
+    ],
+    UF2000_ULLD: [
+        { id: 1, name: "DieRowSize",  type: "uint32", offset: 24, default: 4500 },
+        { id: 3, name: "FlatAngle",   type: "uint16", offset: 42, default: 180  }
+    ]
+};</code></pre>
+        <h3>協同建構機制：</h3>
+        <ul>
+            <li><strong>宣告端 (devList)</strong>：自動讀取 Schema，向機台註冊參數 ID 與對應的二進位偏移量（Offset）。</li>
+            <li><strong>賦值端 (devParm)</strong>：依據同一個 Schema 物件將 UI 輸入的值填入指定的二進位空間。<strong>源頭唯一，結構永遠對齊。</strong></li>
+        </ul>
+    </div>
+
+    <div class="slide-card" id="slide5">
+        <div class="slide-num">Slide 5 / 7</div>
+        <h2>Flat Angle 限制與二進位型態防呆</h2>
+        <p>使用者輸入的數值通常是不可控的，網頁系統在透過 DataView 將數值寫入二進位空間（ArrayBuffer）之前，建置了兩道核心防呆牆：</p>
+        
+        <h3>1. 參數數值邊界限幅 (Clamp 運算)</h3>
+        <p>以平邊角度（Flat / Notch Angle）為例，實機暫存器僅接受 <code>0 ~ 359</code> 度的整數。系統在讀取 UI 值後，會強制進行限幅運算，防止極端值寫入：</p>
+        <pre><code>let safeAngle = Math.max(0, Math.min(359, config.flatAngle));</code></pre>
+        
+        <h3>2. 顯式型態轉換 (Big-Endian 大端序寫入)</h3>
+        <p>依據 Schema 宣告的數據型態，精確調用特定長度的二進位指標寫入器，且機台預設為<strong>大端序（高點位組在前，false）</strong>：
+        <ul>
+            <li><code>uint8</code>：調用 <code>dv.setUint8(offset, val)</code>，精確佔用 1 個位元組。</li>
+            <li><code>uint16</code>：調用 <code>dv.setUint16(offset, val, false)</code>，精確佔用 2 個位元組。</li>
+            <li><code>uint32</code>：調用 <code>dv.setUint32(offset, val, false)</code>，精確佔用 4 個位元組。</li>
+        </ul>
+    </div>
+
+    <div class="slide-card" id="slide6">
+        <div class="slide-num">Slide 6 / 7</div>
+        <h2>16-bit 雙位元組工業級補碼 Checksum 校驗</h2>
+        <p>為防範地圖數據在網絡傳輸或儲存時發生微小損壞（Bit Flip），東京電子（TEL）機台在讀取 <code>dieData.dat</code> 與 <code>devParm.dat</code> 時，會強制執行結尾 2 個位元組的 Checksum 檢查。系統對此設計了標準二進位補碼演算：</p>
+        
+        <h3>校驗碼生成三步驟：</h3>
+        <p><strong>Step 1. 區間累加 (Byte Accumulation)</strong>：排除檔案最後 2 個位元組，使用迴圈將前面數萬個 Byte 的無符號值逐一加總。</p>
+        <p><strong>Step 2. 16位元遮罩截斷 (Masking)</strong>：加總值可能非常龐大，將其與 <code>0xFFFF</code> 進行位元與（AND）運算，只保留低位元的 16-bit 空間。</p>
+        <p><strong>Step 3. 二進位求補碼 (Two's Complement)</strong>：透過以下公式求出補碼，並將結果以大端序（Uint16）寫入檔案最後 2 個位元組：</p>
+        
+        <div class="formula">Final_Checksum = (0x10000 - (Sum & 0xFFFF)) & 0xFFFF</div>
+        <p>當實機讀取整個檔案時，全檔加總（包含此 Checksum）的結果會剛好溢出歸零（Sum = 0），即可順利通過機台的相容性檢查。</p>
+    </div>
+
+    <div class="slide-card" id="slide7">
+        <div class="slide-num">Slide 7 / 7</div>
+        <h2>結論：網頁單兵架構的實用價值</h2>
+        <p>本套 <strong>Prober MAP Editor v3.0</strong> 方案，成功利用現代瀏覽器的高效能特性，為半導體測試產線提供了輕量化的虛擬地圖編輯工具：</p>
+        
+        <h3>核心技術優勢總結：</h3>
+        <ul>
+            <li><strong>零後端依賴</strong>：完全基於客戶端 JavaScript 運行，免安裝任何專屬軟體或編譯環境，降低資安風險。</li>
+            <li><strong>產線直覺介面</strong>：將 6 吋晶圓收斂至 32x32 矩陣，總測試數穩定於 500~700 顆（純良品預設）。優化的 14px Canvas 點擊格點，大幅提升手動變更與客製化標記的便利性。</li>
+            <li><strong>高精度相容性</strong>：透過動態 Schema、嚴格大端序寫入與補碼 Checksum 演算，產出的二進位 DAT 產品檔能無縫投入實機使用。</li>
+        </ul>
+    </div>
+
+</div>
+
+<div class="quick-nav">
+    <a href="#slide1">1</a>
+    <a href="#slide2">2</a>
+    <a href="#slide3">3</a>
+    <a href="#slide4">4</a>
+    <a href="#slide5">5</a>
+    <a href="#slide6">6</a>
+    <a href="#slide7">7</a>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prober MAP Editor v3.0 (6吋純良品版)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #1e1e2e;
+            --panel-bg: #252538;
+            --text-color: #cdd6f4;
+            --accent-color: #00d4ff;
+            --border-color: #45475a;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--accent-color); }
+        .main-container {
+            display: flex;
+            flex: 1;
+            gap: 15px;
+            overflow: hidden;
+        }
+        .panel {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar { width: 340px; overflow-y: auto; }
+        .canvas-area {
+            flex: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #11111b;
+            overflow: hidden;
+        }
+        canvas {
+            border: 1px solid var(--border-color);
+            cursor: grab;
+            background-color: #181825;
+        }
+        canvas:active { cursor: grabbing; }
+        .form-group {
+            margin-bottom: 12px;
+        }
+        label {
+            display: block;
+            font-size: 0.85rem;
+            margin-bottom: 5px;
+            color: #a6adc8;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            background-color: #11111b;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: #fff;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: var(--accent-color);
+            border: none;
+            border-radius: 4px;
+            color: #11111b;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+        .btn-secondary {
+            background-color: #45475a;
+            color: #cdd6f4;
+        }
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+            font-size: 0.8rem;
+        }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .color-box { width: 12px; height: 12px; border-radius: 2px; border: 1px solid #fff; }
+        .info-box {
+            background-color: #11111b;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            margin-top: 10px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Prober MAP Editor v3.0 (6" 純良品版)</h1>
+    <div id="statusText">系統就緒</div>
+</header>
+
+<div class="main-container">
+    <div class="panel sidebar">
+        <h3>機型與結構設定</h3>
+        <div class="form-group">
+            <label for="modelType">目標探針台機型</label>
+            <select id="modelType">
+                <option value="UF200_LLD">UF200 Gen1 (M-LLD/LLD) [38,400 bytes]</option>
+                <option value="UF2000_ULLD">UF2000 Gen2 (ULLD) [51,968 bytes]</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="mapRows">Map 總行數 (Rows)</label>
+            <input type="number" id="mapRows" value="32" min="10" max="200">
+        </div>
+        <div class="form-group">
+            <label for="mapCols">Map 總列數 (Cols)</label>
+            <input type="number" id="mapCols" value="32" min="10" max="200">
+        </div>
+        <div class="form-group">
+            <label for="flatAngle">平邊角度 (Flat/Notch Angle)</label>
+            <input type="number" id="flatAngle" value="180" min="0" max="359">
+        </div>
+        <div class="form-group">
+            <label for="pickRoute">掃描路徑 (Pick Route)</label>
+            <select id="pickRoute">
+                <option value="S_ROUTE">S 形交錯掃描</option>
+                <option value="Z_ROUTE">Z 形單向掃描</option>
+                <option value="SPIRAL_IN">螺旋向內</option>
+            </select>
+        </div>
+
+        <button id="btnGenerateMap">重新生成晶圓地圖</button>
+        <button id="btnExportZip" class="btn-secondary">打包導出產品檔 (.ZIP)</button>
+
+        <h3>圖例說明</h3>
+        <div class="legend">
+            <div class="legend-item"><div class="color-box" style="background-color: #45475a;"></div>外部無效區(0x00)</div>
+            <div class="legend-item"><div class="color-box" style="background-color: #a6e3a1;"></div>測試良品(0x40)</div>
+            <div class="legend-item"><div class="color-box" style="background-color: #f38ba8;"></div>測試不良(0x01)</div>
+            <div class="legend-item"><div class="color-box" style="background-color: #fab387;"></div>邊緣良品(0x80)</div>
+            <div class="legend-item"><div class="color-box" style="background-color: #f9e2af;"></div>邊緣不良(0x02)</div>
+        </div>
+
+        <h3>二進位檔案資訊</h3>
+        <div class="info-box" id="infoBox">請點擊生成。</div>
+    </div>
+
+    <div class="panel canvas-area">
+        <canvas id="mapCanvas" width="600" height="600"></canvas>
+    </div>
+</div>
+
+<script>
+let mapGrid = [];
+let config = { rows: 32, cols: 32, flatAngle: 180, modelType: 'UF200_LLD', route: 'S_ROUTE' };
+let canvas, ctx;
+let transform = { x: 0, y: 0, scale: 1 };
+let isDragging = false;
+let startPan = { x: 0, y: 0 };
+let hoveredDie = null;
+
+const PARAM_SCHEMA = {
+    UF200_LLD: [
+        { id: 1,  name: "DieRowSize",   type: "uint32", offset: 12, default: 4500 },
+        { id: 2,  name: "DieColSize",   type: "uint32", offset: 16, default: 4500 },
+        { id: 3,  name: "FlatAngle",    type: "uint16", offset: 30, default: 180  },
+        { id: 4,  name: "PassBinCode",  type: "uint8",  offset: 32, default: 1    },
+        { id: 5,  name: "FailBinCode",  type: "uint8",  offset: 33, default: 2    }
+    ],
+    UF2000_ULLD: [
+        { id: 1,  name: "DieRowSize",   type: "uint32", offset: 24, default: 4500 },
+        { id: 2,  name: "DieColSize",   type: "uint32", offset: 28, default: 4500 },
+        { id: 3,  name: "FlatAngle",    type: "uint16", offset: 42, default: 180  },
+        { id: 4,  name: "PassBinCode",  type: "uint8",  offset: 44, default: 1    },
+        { id: 5,  name: "FailBinCode",  type: "uint8",  offset: 45, default: 2    }
+    ]
+};
+
+window.addEventListener('DOMContentLoaded', () => {
+    canvas = document.getElementById('mapCanvas');
+    ctx = canvas.getContext('2d');
+    
+    document.getElementById('btnGenerateMap').addEventListener('click', generateInitialMap);
+    document.getElementById('btnExportZip').addEventListener('click', exportProductZip);
+    
+    canvas.addEventListener('mousedown', onMouseDown);
+    canvas.addEventListener('mousemove', onMouseMove);
+    canvas.addEventListener('mouseup', () => isDragging = false);
+    canvas.addEventListener('mouseleave', () => isDragging = false);
+    canvas.addEventListener('wheel', onWheel);
+    
+    generateInitialMap();
+    resetView();
+});
+
+// ==========================================
+// 4. 地圖生成演算法 (已移除隨機不良預測)
+// ==========================================
+function generateInitialMap() {
+    config.rows = parseInt(document.getElementById('mapRows').value);
+    config.cols = parseInt(document.getElementById('mapCols').value);
+    config.flatAngle = parseInt(document.getElementById('flatAngle').value);
+    config.modelType = document.getElementById('modelType').value;
+    config.route = document.getElementById('pickRoute').value;
+
+    mapGrid = [];
+    const cx = (config.cols - 1) / 2;
+    const cy = (config.rows - 1) / 2;
+    const radius = Math.min(config.rows, config.cols) * 0.48;
+    const edgeThickness = 1.2; 
+
+    for (let r = 0; r < config.rows; r++) {
+        mapGrid[r] = [];
+        for (let c = 0; c < config.cols; c++) {
+            const dx = c - cx;
+            const dy = r - cy;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            let status = 'none'; 
+            let fail = false;
+            let bin = 0;
+
+            if (dist <= radius - edgeThickness) {
+                status = 'active'; // 核心修正：全部預設為良品，移除隨機 Math.random 不良預測
+                fail = false;
+            } else if (dist <= radius) {
+                status = 'edge'; 
+                fail = (dist > radius - edgeThickness + 0.4); 
+            }
+
+            mapGrid[r][c] = { status, fail, bin, r, c };
+        }
+    }
+
+    updateInfoBox();
+    drawMap();
+    document.getElementById('statusText').innerText = `已生成地圖`;
+}
+
+function drawMap() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.translate(transform.x, transform.y);
+    ctx.scale(transform.scale, transform.scale);
+
+    const dieW = 14; 
+    const dieH = 14;
+    const step = 15;
+
+    for (let r = 0; r < config.rows; r++) {
+        for (let c = 0; c < config.cols; c++) {
+            const d = mapGrid[r][c];
+            const x = c * step;
+            const y = r * step;
+
+            if (d.status === 'active') {
+                ctx.fillStyle = d.fail ? '#f38ba8' : '#a6e3a1'; 
+            } else if (d.status === 'edge') {
+                ctx.fillStyle = d.fail ? '#f9e2af' : '#fab387'; 
+            } else {
+                ctx.fillStyle = '#45475a'; 
+            }
+
+            if (hoveredDie && hoveredDie.r === r && hoveredDie.c === c) {
+                ctx.fillStyle = '#00d4ff';
+            }
+
+            ctx.fillRect(x, y, dieW, dieH);
+        }
+    }
+    ctx.restore();
+}
+
+function resetView() {
+    transform.scale = Math.min(canvas.width / (config.cols * 16), canvas.height / (config.rows * 16));
+    transform.x = (canvas.width - config.cols * 16 * transform.scale) / 2;
+    transform.y = (canvas.height - config.rows * 16 * transform.scale) / 2;
+    drawMap();
+}
+
+function onMouseDown(e) {
+    if (e.button === 0) {
+        isDragging = true;
+        startPan = { x: e.clientX - transform.x, y: e.clientY - transform.y };
+    }
+}
+
+function onMouseMove(e) {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    if (isDragging) {
+        transform.x = e.clientX - startPan.x;
+        transform.y = e.clientY - startPan.y;
+        drawMap();
+    } else {
+        const worldX = (mouseX - transform.x) / transform.scale;
+        const worldY = (mouseY - transform.y) / transform.scale;
+        const c = Math.floor(worldX / 15);
+        const r = Math.floor(worldY / 15);
+
+        if (r >= 0 && r < config.rows && c >= 0 && c < config.cols) {
+            hoveredDie = mapGrid[r][c];
+        } else {
+            hoveredDie = null;
+        }
+        drawMap();
+    }
+}
+
+function onWheel(e) {
+    e.preventDefault();
+    if (e.deltaY < 0) transform.scale *= 1.1;
+    else transform.scale /= 1.1;
+    drawMap();
+}
+
+canvas.addEventListener('click', () => {
+    if (hoveredDie) {
+        const d = mapGrid[hoveredDie.r][hoveredDie.c];
+        if (d.status === 'active' && !d.fail) {
+            d.fail = true; d.bin = 1;
+        } else if (d.status === 'active' && d.fail) {
+            d.status = 'none'; d.fail = false;
+        } else {
+            d.status = 'active'; d.fail = false; d.bin = 0;
+        }
+        updateInfoBox();
+        drawMap();
+    }
+});
+
+function buildDieData() {
+    const size = (config.modelType === 'UF2000_ULLD') ? 51968 : 38400;
+    const buffer = new ArrayBuffer(size);
+    const dv = new DataView(buffer);
+
+    dv.setUint8(0, 0x10); 
+    dv.setUint16(2, config.rows, false);
+    dv.setUint16(4, config.cols, false);
+
+    let offset = 32; 
+    for (let r = 0; r < config.rows; r++) {
+        for (let c = 0; c < config.cols; c++) {
+            if (offset >= size - 2) break;
+
+            const d = mapGrid[r][c];
+            let statusByte = 0x00; 
+
+            if (d.status === 'edge') {
+                statusByte = d.fail ? 0x02 : 0x80;
+            } else if (d.status === 'active') {
+                statusByte = d.fail ? 0x01 : 0x40; 
+            }
+
+            dv.setUint8(offset, statusByte);
+            offset++;
+        }
+    }
+
+    let checksum = 0;
+    for (let i = 0; i < size - 2; i++) {
+        checksum += dv.getUint8(i);
+    }
+    dv.setUint16(size - 2, (0x10000 - (checksum & 0xFFFF)) & 0xFFFF, false);
+
+    return buffer;
+}
+
+function buildDevList() {
+    const schema = PARAM_SCHEMA[config.modelType] || PARAM_SCHEMA.UF200_LLD;
+    const entrySize = 32;
+    const headerSize = 16;
+    const totalSize = headerSize + (schema.length * entrySize);
+
+    const buffer = new ArrayBuffer(totalSize);
+    const dv = new DataView(buffer);
+
+    dv.setUint16(0, 0x20, false);        
+    dv.setUint16(2, schema.length, false); 
+
+    schema.forEach((param, index) => {
+        const entryOffset = headerSize + (index * entrySize);
+        dv.setUint16(entryOffset, param.id, false);
+        let typeCode = 1; 
+        if (param.type === 'uint16') typeCode = 2;
+        if (param.type === 'uint32') typeCode = 4;
+        dv.setUint8(entryOffset + 2, typeCode);
+        dv.setUint32(entryOffset + 4, param.offset, false);
+    });
+
+    return buffer;
+}
+
+function buildDevParm() {
+    const size = (config.modelType === 'UF2000_ULLD') ? 51968 : 38400;
+    const buffer = new ArrayBuffer(size);
+    const dv = new DataView(buffer);
+
+    dv.setUint16(0, 0x30, false); 
+
+    const schema = PARAM_SCHEMA[config.modelType] || PARAM_SCHEMA.UF200_LLD;
+
+    schema.forEach(param => {
+        let val = param.default;
+        if (param.name === "FlatAngle") {
+            val = Math.max(0, Math.min(359, config.flatAngle));
+        }
+
+        switch (param.type) {
+            case 'uint8':  dv.setUint8(param.offset, val); break;
+            case 'uint16': dv.setUint16(param.offset, val, false); break;
+            case 'uint32': dv.setUint32(param.offset, val, false); break;
+        }
+    });
+
+    let checksum = 0;
+    for (let i = 0; i < size - 2; i++) {
+        checksum += dv.getUint8(i);
+    }
+    dv.setUint16(size - 2, (0x10000 - (checksum & 0xFFFF)) & 0xFFFF, false);
+
+    return buffer;
+}
+
+function buildGenericData(headerByte) {
+    const size = (config.modelType === 'UF2000_ULLD') ? 51968 : 38400;
+    const buffer = new ArrayBuffer(size);
+    const dv = new DataView(buffer);
+    dv.setUint8(0, headerByte);
+    return buffer;
+}
+
+// ==========================================
+// 8. 狀態統計更新 (核心修正：移除不良數及文字)
+// ==========================================
+function updateInfoBox() {
+    let totalDie = 0, passDie = 0;
+    mapGrid.forEach(row => row.forEach(d => {
+        if (d.status === 'active') {
+            totalDie++;
+            if (!d.fail) passDie++;
+        }
+    }));
+
+    // 核心修正：移除「預測不良顆數」，移除「符合 500~700 正常範圍」字眼
+    const info = `【晶圓規格配置】\n` +
+                 `探針台型號: ${config.modelType}\n` +
+                 `矩陣大小: ${config.rows} x ${config.cols}\n` +
+                 `平邊角度: ${config.flatAngle}°\n\n` +
+                 `【目前晶粒統計】\n` +
+                 `有效測試總顆數: ${totalDie} ea\n` +
+                 ` └─ 良品顆數 (Pass): ${passDie} ea`;
+    document.getElementById('infoBox').innerText = info;
+}
+
+function exportProductZip() {
+    document.getElementById('statusText').innerText = "正在打包資料...";
+    const zip = new JSZip();
+
+    zip.file("dieData.dat", buildDieData());
+    zip.file("devParm.dat", buildDevParm());
+    zip.file("devList.dat", buildDevList());
+    zip.file("videoData.dat", buildGenericData(0x40)); 
+    zip.file("opParm.dat", buildGenericData(0x50));    
+
+    zip.generateAsync({ type: "blob" }).then((content) => {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(content);
+        link.download = `Map_${config.modelType}_V3.zip`;
+        link.click();
+        document.getElementById('statusText').innerText = "導出成功！檔案已下載。";
+    }).catch(err => {
+        console.error(err);
+        document.getElementById('statusText').innerText = "導出失敗。";
+    });
+}
+</script>
+
+</body>
+</html>
