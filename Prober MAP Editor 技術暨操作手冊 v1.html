@@ -21,13 +21,62 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
-            padding: 40px 20px;
+            padding: 0;
             display: flex;
-            flex-direction: column;
-            align-items: center;
+            justify-content: center;
         }
+        /* 雙欄版面配置 */
+        .wrapper {
+            display: flex;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            gap: 30px;
+        }
+        /* 左側固定式目錄欄 */
+        .sidebar {
+            width: 250px;
+            flex-shrink: 0;
+            position: sticky;
+            top: 40px;
+            height: fit-content;
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        .sidebar h3 {
+            color: var(--accent-color);
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+        .sidebar ul {
+            list-style: none;
+            padding-left: 0;
+            margin: 0;
+        }
+        .sidebar li {
+            margin-bottom: 12px;
+        }
+        .sidebar a {
+            color: #a6adc8;
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.2s;
+            display: block;
+            line-height: 1.4;
+        }
+        .sidebar a:hover {
+            color: var(--accent-color);
+        }
+        /* 右側主內文區 */
         .container {
-            max-width: 1000px;
+            flex-grow: 1;
+            max-width: 900px;
             width: 100%;
         }
         header {
@@ -37,8 +86,8 @@
             padding-bottom: 20px;
         }
         h1 { color: var(--accent-color); margin-bottom: 10px; font-size: 2.2rem; }
-        h2 { color: var(--accent-secondary); margin-top: 30px; border-left: 4px solid var(--accent-color); padding-left: 10px; font-size: 1.5rem; }
-        h3 { color: var(--accent-color); font-size: 1.1rem; margin-top: 20px; }
+        h2 { color: var(--accent-secondary); margin-top: 40px; border-left: 4px solid var(--accent-color); padding-left: 10px; font-size: 1.5rem; scroll-margin-top: 40px; }
+        h3 { color: var(--accent-color); font-size: 1.1rem; margin-top: 25px; }
         p, li { line-height: 1.6; color: #a6adc8; font-size: 1rem; }
         ul, ol { padding-left: 20px; }
         li { margin-bottom: 8px; }
@@ -46,7 +95,6 @@
         pre { background-color: var(--code-bg); padding: 15px; border-radius: 6px; overflow-x: auto; border: 1px solid var(--border-color); }
         pre code { color: #f8f8f2; background-color: transparent; padding: 0; }
         .warning-box { background: rgba(255, 107, 53, 0.1); border-left: 4px solid var(--accent-secondary); padding: 15px; margin: 20px 0; border-radius: 0 6px 6px 0; }
-        .success-box { background: rgba(0, 230, 118, 0.1); border-left: 4px solid var(--pass-color); padding: 15px; margin: 20px 0; border-radius: 0 6px 6px 0; }
         table { width: 100%; border-collapse: collapse; margin: 20px 0; background-color: var(--card-bg); border-radius: 6px; overflow: hidden; }
         th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border-color); }
         th { background-color: rgba(0, 212, 255, 0.1); color: var(--accent-color); font-weight: bold; }
@@ -57,167 +105,182 @@
 </head>
 <body>
 
-<div class="container">
-    <header>
-        <h1>Prober MAP Editor 技術說明書暨操作手冊 v1</h1>
-        <p>文件版本：v1.0 綜合增訂版 | 適用機型：TEL UF200 / UF2000 | 核心功能：自定義測試區與邊緣偷 Die 支援</p>
-    </header>
-
-    <section id="sec1">
-        <h2>1. 系統定位與用途</h2>
-        <p>本套 <code>Prober MAP Editor</code> 前端網頁工具，專為半導體晶圓測試（CP, Chip Probe）產線工程師與產品工程師設計。主要用途在於因應客戶緊急改單、實驗片測試、或是機台故障復機時，能以<strong>「無須依賴複雜大型生產自動化系統（EAP）」</strong>的單機架構，快速生成完全符合東京電子（Tokyo Electron Limited）系列探針台規範的硬體地圖壓縮檔（<code>Product.zip</code>）。</p>
-        <p>在最新版本中，系統打破了傳統固定幾何晶圓演算法的限制，全面支援<strong>手動任意塗抹測試區與不測試區（Skip Area）</strong>，並能因應 Yield 榨取實務進行邊緣不完整晶粒的<strong>「偷 Edge Die」開通針測功能</strong>，以最大化晶圓產出並提供產線最高度的靈活性。</p>
-    </section>
-
-    <section id="sec2">
-        <h2>2. 機台二進位容量規範 (Fixed-size Specifications)</h2>
-        <p>早期硬體系統定址極度嚴格，TEL 機台韌體硬性規定了所有產品參數檔與地圖檔的實體空間長度。如果生成的檔案大小與規範不符，將直接引發機台軟體阻斷並扣機報錯。本工具產出的檔案大小完全符合以下硬體規範：</p>
-        <table>
-            <thead>
-                <tr>
-                    <th>探針台型號</th>
-                    <th>硬體規範對應代碼</th>
-                    <th>規定單一檔案實體長度 (Bytes)</th>
-                    <th>二進位末端填充字元 (Padding Flag)</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><strong>TEL UF200 / M-LLD</strong></td>
-                    <td><code>UF200_LLD</code></td>
-                    <td><strong>38,400 位元組</strong></td>
-                    <td><code>0x50</code> (ASCII 'P')</td>
-                </tr>
-                <tr>
-                    <td><strong>TEL UF2000 / ULLD</strong></td>
-                    <td><code>UF2000_ULLD</code></td>
-                    <td><strong>51,968 位元組</strong></td>
-                    <td><code>0x50</code> (ASCII 'P')</td>
-                </tr>
-            </tbody>
-        </table>
-    </section>
-
-    <section id="sec3">
-        <h2>3. 五大核心檔案與硬體暫存器架構設計</h2>
-        <p>本系統導出的 <code>Product.zip</code> 內部包含五個關鍵二進位檔案。其底層序列化（Serialization）與記憶體位址（Offsets）完全符合硬體實體記憶體對應：</p>
-        
-        <h3>3.1 dieData.dat (晶圓地圖資料檔)</h3>
-        <p>負責儲存 32x32 的晶圓二進位地圖。前 64 位元組為管理標頭（包含 Row/Col 數量及版本），第 64 位元組起為行優先（Row-Major）的 8 位元無符號整數（Uint8）矩陣。</p>
-        <p>系統全面支援動態轉化，矩陣中的每個位元組可依工程師手動點擊或演算法結果，精確序列化為以下三種工業標準狀態碼：</p>
+<div class="wrapper">
+    <nav class="sidebar">
+        <h3>手冊目錄</h3>
         <ul>
-            <li><code>0x40</code> (十進位 64)：<strong>良品晶粒 (Pass)</strong> ─ 機台會落針測試並判定為良品。</li>
-            <li><code>0x01</code> (十進位 1)：<strong>不良品晶粒 (Fail)</strong> ─ 機台會落針測試並判定為不良品。</li>
-            <li><code>0x00</code> (十進位 0)：<strong>不測試區 (Skip Area)</strong> ─ 機台探針座移動到此座標時，自動執行安全離合、跳過不測。</li>
+            <li><a href="#sec1">1. 系統定位與用途</a></li>
+            <li><a href="#sec2">2. 機台二進位容量規範</a></li>
+            <li><a href="#sec3">3. 五大核心檔案與架構</a></li>
+            <li><a href="#sec4">4. 介面與控制項說明</a></li>
+            <li><a href="#sec5">5. 資訊統計欄位解析</a></li>
+            <li><a href="#sec6">6. 安全性與校驗機制</a></li>
+            <li><a href="#sec7">7. 產線標準操作步驟 (SOP)</a></li>
         </ul>
+    </nav>
 
-        <h3>3.2 devParm.dat (產品硬體參數檔)</h3>
-        <p>此檔案儲存產品的物理結構參數。系統將依據使用者在網頁填入的數值，精確尋址到特定 Offset 進行 Big-Endian 二進位複寫：</p>
-        <ul>
-            <li><code>DieRowSize</code> & <code>DieColSize</code>：晶粒幾何尺寸（預設 4500um），在 UF2000 位於 Offset 24/28，在 UF200 位於 Offset 12/16。</li>
-            <li><code>FlatAngle</code>：晶圓平邊角度（可設 0, 90, 180, 270 度），在 UF2000 位於 Offset 42，在 UF200 位於 Offset 30。</li>
-            <li><code>PassBinCode</code> & <code>FailBinCode</code>：良率判定碼（預設 64 與 1），在 UF2000 位於 Offset 44/45，在 UF200 位於 Offset 32/33。</li>
-        </ul>
+    <main class="container">
+        <header>
+            <h1>Prober MAP Editor 技術說明書暨操作手冊 v1</h1>
+            <p>文件版本：v1.0 綜合增訂版 | 適用機型：TEL UF200 / UF2000 | 核心功能：自定義測試區與邊緣偷 Die 支援</p>
+        </header>
 
-        <h3>3.3 devList.dat (參數映射索引檔)</h3>
-        <p>指示機台如何解析 <code>devParm.dat</code>。系統在此檔案中從 Offset 12 開始，每 32 位元組劃分出一個參數指標塊，填入 Parameter ID、Offset 及型態碼（<code>0x04</code>=Uint32, <code>0x02</code>=Uint16, <code>0x01</code>=Uint8），確保硬體解碼正確。</p>
+        <section id="sec1">
+            <h2>1. 系統定位與用途</h2>
+            <p>本套 <code>Prober MAP Editor</code> 前端網頁工具，專為半導體晶圓測試（CP, Chip Probe）產線工程師與產品工程師設計。主要用途在於因應客戶緊急改單、實驗片測試、或是機台故障復機時，能以<strong>「無須依賴複雜大型生產自動化系統（EAP）」</strong>的單機架構，快速生成完全符合東京電子（Tokyo Electron Limited）系列探針台規範的硬體地圖壓縮檔（<code>Product.zip</code>）。</p>
+            <p>在最新版本中，系統打破了傳統固定幾何晶圓演算法的限制，全面支援<strong>手動任意塗抹測試區與不測試區（Skip Area）</strong>，並能因應 Yield 榨取實務進行邊緣不完整晶粒的<strong>「偷 Edge Die」開通針測功能</strong>，以最大化晶圓產出並提供產線最高度的靈活性。</p>
+        </section>
 
-        <h3>3.4 videoData.dat 與 opParm.dat (通用對齊檔)</h3>
-        <p>相機定位與作業參數檔。開頭填入 <code>"3.00"</code> 版本字串。Offset 11 處會自動寫入相機架構通道代碼（UF2000 寫入 <code>0x04</code> 4鏡頭，UF200 寫入 <code>0x02</code> 2鏡頭）。其餘空間依規範分別以 <code>0x40</code> 和 <code>0x50</code> 填充至指定總長度。</p>
-    </section>
+        <section id="sec2">
+            <h2>2. 機台二進位容量規範 (Fixed-size Specifications)</h2>
+            <p>早期硬體系統定址極度嚴格，TEL 機台韌體硬性規定了所有產品參數檔與地圖檔的實體空間長度。如果生成的檔案大小與規範不符，將直接引發機台軟體阻斷並扣機報錯。本工具產出的檔案大小完全符合以下硬體規範：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>探針台型號</th>
+                        <th>硬體規範對應代碼</th>
+                        <th>規定單一檔案實體長度 (Bytes)</th>
+                        <th>二進位末端填充字元 (Padding Flag)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>TEL UF200 / M-LLD</strong></td>
+                        <td><code>UF200_LLD</code></td>
+                        <td><strong>38,400 位元組</strong></td>
+                        <td><code>0x50</code> (ASCII 'P')</td>
+                    </tr>
+                    <tr>
+                        <td><strong>TEL UF2000 / ULLD</strong></td>
+                        <td><code>UF2000_ULLD</code></td>
+                        <td><strong>51,968 位元組</strong></td>
+                        <td><code>0x50</code> (ASCII 'P')</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
 
-    <section id="sec4">
-        <h2>4. 介面與控制項說明</h2>
-        <p>系統提供直覺的參數配置面板，所有欄位與硬體底層的對應邏輯如下：</p>
-        <table>
-            <thead>
-                <tr>
-                    <th>網格控制項名稱</th>
-                    <th>允許設定值 / 行為</th>
-                    <th>對應硬體暫存器與底層邏輯</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><strong>探針台型號 (Model Type)</strong></td>
-                    <td><code>UF200_LLD</code> / <code>UF2000_ULLD</code></td>
-                    <td>切換二進位檔案總容量、相機旗標及變數 Offset 定址 Schema。</td>
-                </tr>
-                <tr>
-                    <td><strong>平邊角度 (Flat Angle)</strong></td>
-                    <td><code>0°</code>, <code>90°</code>, <code>180°</code>, <code>270°</code></td>
-                    <td>定義實機承載台（Chuck）載入晶圓時平邊（Flat/Notch）的朝向，寫入指定 Offset。</td>
-                </tr>
-                <tr>
-                    <td><strong>滑鼠點擊編輯模式 (Edit Mode)</strong></td>
-                    <td>
-                        良品(Pass) / 不良品(Fail) / 不測試(Skip)
-                    </td>
-                    <td>
-                        提供三種功能色彩分明的網格刷子，點擊畫布可任意開通、修改或抹除特定座標晶粒。
-                    </td>
-                </tr>
-                <tr>
-                    <td><strong>重設地圖 (Reset Map)</strong></td>
-                    <td>點擊觸發</td>
-                    <td>調用標準 6 吋晶圓向心收斂演算法，重新初始化圓形網格地圖。</td>
-                </tr>
-                <tr>
-                    <td><strong>下載產品包 (Export Product.zip)</strong></td>
-                    <td>點擊匯出</td>
-                    <td>調用 <code>JSZip</code> 進行全自動 Checksum 重新計算與背景二進位封裝下載。</td>
-                </tr>
-            </tbody>
-        </table>
-    </section>
+        <section id="sec3">
+            <h2>3. 五大核心檔案與硬體暫存器架構設計</h2>
+            <p>本系統導出的 <code>Product.zip</code> 內部包含五個關鍵二進位檔案。其底層序列化（Serialization）與記憶體位址（Offsets）完全符合硬體實體記憶體對應：</p>
+            
+            <h3>3.1 dieData.dat (晶圓地圖資料檔)</h3>
+            <p>負責儲存 32x32 的晶圓二進位地圖。前 64 位元組為管理標頭（包含 Row/Col 數量及版本），第 64 位元組起為行優先（Row-Major）的 8 位元無符號整數（Uint8）矩陣。</p>
+            <p>系統全面支援動態轉化，矩陣中的每個位元組可依工程師手動點擊或演算法結果，精確序列化為以下三種工業標準狀態碼：</p>
+            <ul>
+                <li><code>0x40</code> (十進位 64)：<strong>良品晶粒 (Pass)</strong> ─ 機台會落針測試並判定為良品。</li>
+                <li><code>0x01</code> (十進位 1)：<strong>不良品晶粒 (Fail)</strong> ─ 機台會落針測試並判定為不良品。</li>
+                <li><code>0x00</code> (十進位 0)：<strong>不測試區 (Skip Area)</strong> ─ 機台探針座移動到此座標時，自動執行安全離合、跳過不測。</li>
+            </ul>
 
-    <section id="sec5">
-        <h2>5. 資訊統計欄位解析</h2>
-        <p>面板底部的 <code>InfoBox</code> 區域會在每次使用者進行網格點擊、切換角度或變更機型時，即時重算最新二進位地圖內容：</p>
-        <ul>
-            <li><code>總計測試 (Active)</code>：目前地圖中機台<strong>會落針測試</strong>的晶粒總ea數。</li>
-            <li><code>良品 (Pass 0x40)</code>：測試區域中，被標記為 Pass 的綠色晶粒數。</li>
-            <li><code>不良 (Fail 0x01)</code>：測試區域中，被標記為 Fail 的紅色晶粒數。</li>
-            <li><code>總計不測 (Skip 0x00)</code>：目前被標記為深黑色的外部背景或人工關閉（Skip）的晶粒總ea數。</li>
-        </ul>
-    </section>
+            <h3>3.2 devParm.dat (產品硬體參數檔)</h3>
+            <p>此檔案儲存產品的物理結構參數。系統將依據使用者在網頁填入的數值，精確尋址到特定 Offset 進行 Big-Endian 二進位複寫：</p>
+            <ul>
+                <li><code>DieRowSize</code> & <code>DieColSize</code>：晶粒幾何尺寸（預設 4500um），在 UF2000 位於 Offset 24/28，在 UF200 位於 Offset 12/16。</li>
+                <li><code>FlatAngle</code>：晶圓平邊角度（可設 0, 90, 180, 270 度），在 UF2000 位於 Offset 42，在 UF200 位於 Offset 30。</li>
+                <li><code>PassBinCode</code> & <code>FailBinCode</code>：良率判定碼（預設 64 與 1），在 UF2000 位於 Offset 44/45，在 UF200 位於 Offset 32/33。</li>
+            </ul>
 
-    <section id="sec6">
-        <h2>6. 安全性與校驗機制 (16-bit Checksum)</h2>
-        <p>為避免因磁碟損毀、網頁快取異常或傳輸失誤導致的地圖損壞，TEL 機台韌體在載入檔案（如 <code>dieData.dat</code>）時，會強制執行結尾 2 個位元組的 Checksum 檢查。系統對此設計了標準二進位補碼演算：</p>
-        
-        <h3>校驗碼生成三步驟：</h3>
-        <ol>
-            <li><strong>區間累加 (Byte Accumulation)</strong>：排除檔案最後 2 個位元組，使用迴圈將前面數萬個 Byte 的無符號值逐一加總。</li>
-            <li><strong>16位元遮罩截斷 (Masking)</strong>：將加總值與 <code>0xFFFF</code> 進行位元與（AND）運算，只保留低位元的 16-bit 空間。</li>
-            <li><strong>二進位求補碼 (Two's Complement)</strong>：透過以下公式求出補碼，並將結果以大端序（Big-Endian）寫入檔案最後 2 個位元組：</li>
-        </ol>
-        
-        <div class="formula">Final_Checksum = (0x10000 - (Sum & 0xFFFF)) & 0xFFFF;</div>
-        
-        <p>無論工程師手動「偷」了幾顆邊緣 Die 或是關閉了哪些區域，系統皆會在點擊匯出時重新計算。當實機載入此檔案並進行全檔加總（包含此 Checksum）時，總和將剛好發生 16 位元溢出而歸零（Sum = 0），即可順利通過機台的防損毀安全性相容檢查。</p>
-    </section>
+            <h3>3.3 devList.dat (參數映射索引檔)</h3>
+            <p>指示機台如何解析 <code>devParm.dat</code>。系統在此檔案中從 Offset 12 開始，每 32 位元組劃分出一個參數指標塊，填入 Parameter ID、Offset 及型態碼（<code>0x04</code>=Uint32, <code>0x02</code>=Uint16, <code>0x01</code>=Uint8），確保硬體解碼正確。</p>
 
-    <section id="sec7">
-        <h2>7. 產線標準操作步驟 (SOP)</h2>
-        <div class="warning-box">
-            <strong>生產前提醒：</strong> 請確保使用現代化瀏覽器（建議使用最新版 Google Chrome 或 Microsoft Edge）以獲得最佳的記憶體緩衝區處理效能與點擊流暢度。
-        </div>
-        <ol>
-            <li><strong>開啟程式</strong>：雙擊開啟 <code>Prober_MAP_Editor.html</code> 網頁。</li>
-            <li><strong>選擇目標機型</strong>：依據當前派工產線實機型號，在左側下拉選單選擇 <code>UF200_LLD</code> 或 <code>UF2000_ULLD</code>。</li>
-            <li><strong>設定物理角度與參數</strong>：在 Flat Angle 輸入框中設定晶圓平邊角度（預設為 <code>180</code>）。</li>
-            <li><strong>執行晶圓初始化</strong>：點擊 <code>Reset Map</code> 按鈕，畫布將依據幾何演算法自動生成標準 6 吋晶圓初始圓形網格。</li>
-            <li><strong>自定義測試區 / 執行「邊緣偷 Die」操作</strong>：
-                <ul>
-                    <li><strong>要偷邊緣 Die 時</strong>：將編輯模式切換至 <span class="color-badge"><span class="dot" style="background-color: var(--pass-color);"></span>🟩 標記良品</span> 或 <span class="color-badge"><span class="dot" style="background-color: var(--fail-color);"></span>🟥 標記不良品</span>，滑鼠直接移動到晶圓最外圈的「深黑色不測試背景區」，點擊該不完整晶粒。該格點將立刻被強制開通，代表<strong>解除演算法幾何限制，強行要求探針台落針測試該邊緣晶粒</strong>。</li>
-                    <li><strong>要手動關閉特定 Die 時</strong>：將編輯模式切換至 <span class="color-badge"><span class="dot" style="background-color: #2d3142;"></span>⬛ 標記為不測試 (Skip)</span>，用滑鼠點擊任意原本是綠色或紅色的晶粒。該格點將立刻被抹黑，代表<strong>通知機台該位置為破片、空谷或不測試區，行經時安全離合、跳過不測</strong>。</li>
-                </ul>
-            </li>
-            <li><strong>確認統計數據</strong>：檢查 <code>InfoBox</code> 欄位，確認 <code>Active</code>、<code>Pass</code> 與 <code>Skip</code> 的 ea 數量與產線通知單或派工單完全相符。</li>
-            <li><strong>匯出產品包</strong>：點擊 <code>Export Product.zip</code> 按鈕，即可獲得經由校驗計算過的工業標準檔案包，透過 CF 卡或網路磁碟載入實機進行生產。</li>
-        </ol>
-    </section>
+            <h3>3.4 videoData.dat 與 opParm.dat (通用對齊檔)</h3>
+            <p>相機定位與作業參數檔。開頭填入 <code>"3.00"</code> 版本字串。Offset 11 處會自動寫入相機架構通道代碼（UF2000 寫入 <code>0x04</code> 4鏡頭，UF200 寫入 <code>0x02</code> 2鏡頭）。其餘空間依規範分別以 <code>0x40</code> 和 <code>0x50</code> 填充至指定總長度。</p>
+        </section>
+
+        <section id="sec4">
+            <h2>4. 介面與控制項說明</h2>
+            <p>系統提供直覺的參數配置面板，所有欄位與硬體底層的對應邏輯如下：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>網格控制項名稱</th>
+                        <th>允許設定值 / 行為</th>
+                        <th>對應硬體暫存器與底層邏輯</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>探針台型號 (Model Type)</strong></td>
+                        <td><code>UF200_LLD</code> / <code>UF2000_ULLD</code></td>
+                        <td>切換二進位檔案總容量、相機旗標及變數 Offset 定址 Schema。</td>
+                    </tr>
+                    <tr>
+                        <td><strong>平邊角度 (Flat Angle)</strong></td>
+                        <td><code>0°</code>, <code>90°</code>, <code>180°</code>, <code>270°</code></td>
+                        <td>定義實機承載台（Chuck）載入晶圓時平邊（Flat/Notch）的朝向，寫入指定 Offset。</td>
+                    </tr>
+                    <tr>
+                        <td><strong>滑鼠點擊編輯模式 (Edit Mode)</strong></td>
+                        <td>
+                            良品(Pass) / 不良品(Fail) / 不測試(Skip)
+                        </td>
+                        <td>
+                            提供三種功能色彩分明的網格刷子，點擊畫布可任意開通、修改或抹除特定座標晶粒。
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>重設地圖 (Reset Map)</strong></td>
+                        <td>點擊觸發</td>
+                        <td>調用標準 6 吋晶圓向心收斂演算法，重新初始化圓形網格地圖。</td>
+                    </tr>
+                    <tr>
+                        <td><strong>下載產品包 (Export Product.zip)</strong></td>
+                        <td>點擊匯出</td>
+                        <td>調用 <code>JSZip</code> 進行全自動 Checksum 重新計算與背景二進位封裝下載。</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section id="sec5">
+            <h2>5. 資訊統計欄位解析</h2>
+            <p>面板底部的 <code>InfoBox</code> 區域會在每次使用者進行網格點擊、切換角度或變更機型時，即時重算最新二進位地圖內容：</p>
+            <ul>
+                <li><code>總計測試 (Active)</code>：目前地圖中機台<strong>會落針測試</strong>的晶粒總ea數。</li>
+                <li><code>良品 (Pass 0x40)</code>：測試區域中，被標記為 Pass 的綠色晶粒數。</li>
+                <li><code>不良 (Fail 0x01)</code>：測試區域中，被標記為 Fail 的紅色晶粒數。</li>
+                <li><code>總計不測 (Skip 0x00)</code>：目前被標記為深黑色的外部背景或人工關閉（Skip）的晶粒總ea數。</li>
+            </ul>
+        </section>
+
+        <section id="sec6">
+            <h2>6. 安全性與校驗機制 (16-bit Checksum)</h2>
+            <p>為避免因磁碟損毀、網頁快取異常或傳輸失誤導致的地圖損壞，TEL 機台韌體在載入檔案（如 <code>dieData.dat</code>）時，會強制執行結尾 2 個位元組的 Checksum 檢查。系統對此設計了標準二進位補碼演算：</p>
+            
+            <h3>校驗碼生成三步驟：</h3>
+            <ol>
+                <li><strong>區間累加 (Byte Accumulation)</strong>：排除檔案最後 2 個位元組，使用迴圈將前面數萬個 Byte 的無符號值逐一加總。</li>
+                <li><strong>16位元遮罩截斷 (Masking)</strong>：將加總值與 <code>0xFFFF</code> 進行位元與（AND）運算，只保留低位元的 16-bit 空間。</li>
+                <li><strong>二進位求補碼 (Two's Complement)</strong>：透過以下公式求出補碼，並將結果以大端序（Big-Endian）寫入檔案最後 2 個位元組：</li>
+            </ol>
+            
+            <div class="formula">Final_Checksum = (0x10000 - (Sum & 0xFFFF)) & 0xFFFF;</div>
+            
+            <p>無論工程師手動「偷」了幾顆邊緣 Die 或是關閉了哪些區域，系統皆會在點擊匯出時重新計算。當實機載入此檔案並進行全檔加總（包含此 Checksum）時，總和將剛好發生 16 位元溢出而歸零（Sum = 0），即可順利通過機台的防損毀安全性相容檢查。</p>
+        </section>
+
+        <section id="sec7">
+            <h2>7. 產線標準操作步驟 (SOP)</h2>
+            <div class="warning-box">
+                <strong>生產前提醒：</strong> 請確保使用現代化瀏覽器（建議使用最新版 Google Chrome 或 Microsoft Edge）以獲得最佳的記憶體緩衝區處理效能與點擊流暢度。
+            </div>
+            <ol>
+                <li><strong>開啟程式</strong>：雙擊開啟 <code>Prober_MAP_Editor.html</code> 網頁。</li>
+                <li><strong>選擇目標機型</strong>：依據當前派工產線實機型號，在左側下拉選單選擇 <code>UF200_LLD</code> 或 <code>UF2000_ULLD</code>。</li>
+                <li><strong>設定物理角度與參數</strong>：在 Flat Angle 輸入框中設定晶圓平邊角度（預設為 <code>180</code>）。</li>
+                <li><strong>執行晶圓初始化</strong>：點擊 <code>Reset Map</code> 按鈕，畫布將依據幾何演算法自動生成標準 6 吋晶圓初始圓形網格。</li>
+                <li><strong>自定義測試區 / 執行「邊緣偷 Die」操作</strong>：
+                    <ul>
+                        <li><strong>要偷邊緣 Die 時</strong>：將編輯模式切換至 <span class="color-badge"><span class="dot" style="background-color: var(--pass-color);"></span>🟩 標記良品</span> 或 <span class="color-badge"><span class="dot" style="background-color: var(--fail-color);"></span>🟥 標記不良品</span>，滑鼠直接移動到晶圓最外圈的「深黑色不測試背景區」，點擊該不完整晶粒。該格點將立刻被強制開通，代表<strong>解除演算法幾何限制，強行要求探針台落針測試該邊緣晶粒</strong>。</li>
+                        <li><strong>要手動關閉特定 Die 時</strong>：將編輯模式切換至 <span class="color-badge"><span class="dot" style="background-color: #2d3142;"></span>⬛ 標記為不測試 (Skip)</span>，用滑鼠點擊任意原本是綠色或紅色的晶粒。該格點將立刻被抹黑，代表<strong>通知機台該位置為破片、空谷或不測試區，行經時安全離合、跳過不測</strong>。</li>
+                    </ul>
+                </li>
+                <li><strong>確認統計數據</strong>：檢查 <code>InfoBox</code> 欄位，確認 <code>Active</code>、<code>Pass</code> 與 <code>Skip</code> 的 ea 數量與產線通知單或派工單完全相符。</li>
+                <li><strong>匯出產品包</strong>：點擊 <code>Export Product.zip</code> 按鈕，即可獲得經由校驗計算過的工業標準檔案包，透過 CF 卡或網路磁碟載入實機進行成功生產。</li>
+            </ol>
+        </section>
+    </main>
 </div>
 
 </body>
