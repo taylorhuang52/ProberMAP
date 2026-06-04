@@ -1,0 +1,1615 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UF2000 Wafer MAP Editor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;700&display=swap');
+
+  :root {
+    --bg:       #0a0e17;
+    --panel:    #0f1624;
+    --border:   #1e2d4a;
+    --accent:   #00d4ff;
+    --accent2:  #ff6b35;
+    --pass:     #00e676;
+    --fail:     #ff1744;
+    --edge:     #37474f;
+    --inactive: #1a2332;
+    --text:     #cdd9f0;
+    --muted:    #546e8a;
+    --glow:     0 0 12px rgba(0,212,255,0.4);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Exo 2', sans-serif;
+    font-size: 13px;
+    display: grid;
+    grid-template-rows: 48px 1fr;
+    grid-template-columns: 280px 1fr 260px;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── HEADER ─────────────────────────────── */
+  header {
+    grid-column: 1 / -1;
+    background: linear-gradient(90deg, #060d1e 0%, #0a1628 60%, #060d1e 100%);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 16px;
+  }
+  header h1 {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 15px;
+    color: var(--accent);
+    letter-spacing: 3px;
+    text-shadow: var(--glow);
+  }
+  header .badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    background: rgba(0,212,255,0.1);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 2px 8px;
+    border-radius: 2px;
+  }
+  header .status-bar {
+    margin-left: auto;
+    display: flex;
+    gap: 24px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  header .status-bar span b { color: var(--accent); }
+
+  /* ── LEFT PANEL (Settings) ───────────────── */
+  #left-panel {
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .section {
+    border-bottom: 1px solid var(--border);
+  }
+  .section-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    padding: 10px 14px 6px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .section-title::before {
+    content: '▶';
+    font-size: 8px;
+    transition: transform 0.2s;
+  }
+  .section-title.open::before { transform: rotate(90deg); }
+  .section-body {
+    padding: 6px 14px 12px;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .section-body.open { display: flex; }
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  label span { font-size: 11px; }
+
+  input[type=text], input[type=number], select {
+    background: #060d1e;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    padding: 5px 8px;
+    border-radius: 3px;
+    outline: none;
+    width: 100%;
+    transition: border-color 0.2s;
+  }
+  input:focus, select:focus { border-color: var(--accent); box-shadow: var(--glow); }
+
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .row2 label { width: 100%; }
+
+  /* ── CENTER (Wafer Canvas) ───────────────── */
+  #center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    background: radial-gradient(ellipse at center, #0d1a2e 0%, #060d1e 70%);
+  }
+
+  #wafer-wrap {
+    position: relative;
+    cursor: crosshair;
+    user-select: none;
+  }
+
+  #wafer-canvas {
+    display: block;
+  }
+
+  .canvas-tools {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    background: rgba(10,14,23,0.9);
+    border: 1px solid var(--border);
+    padding: 6px 10px;
+    border-radius: 4px;
+  }
+
+  /* ── RIGHT PANEL ─────────────────────────── */
+  #right-panel {
+    border-left: 1px solid var(--border);
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow-y: auto;
+  }
+
+  /* ── BUTTONS ─────────────────────────────── */
+  .btn {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    padding: 7px 12px;
+    border: 1px solid;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+    background: transparent;
+  }
+  .btn-primary {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .btn-primary:hover {
+    background: var(--accent);
+    color: #000;
+    box-shadow: var(--glow);
+  }
+  .btn-danger {
+    border-color: var(--fail);
+    color: var(--fail);
+  }
+  .btn-danger:hover { background: var(--fail); color: #fff; }
+  .btn-success {
+    border-color: var(--pass);
+    color: var(--pass);
+    font-size: 12px;
+    padding: 9px 14px;
+  }
+  .btn-success:hover { background: var(--pass); color: #000; box-shadow: 0 0 12px rgba(0,230,118,0.4); }
+  .btn-warn {
+    border-color: var(--accent2);
+    color: var(--accent2);
+  }
+  .btn-warn:hover { background: var(--accent2); color: #fff; }
+  .btn-sm {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+
+  .btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* ── TOOL MODE SELECTOR ──────────────────── */
+  .tool-mode {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .tool-mode button {
+    flex: 1;
+    padding: 5px 0;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    border-right: 1px solid var(--border);
+  }
+  .tool-mode button:last-child { border-right: none; }
+  .tool-mode button.active {
+    background: var(--accent);
+    color: #000;
+  }
+  .tool-mode button:hover:not(.active) { background: rgba(0,212,255,0.1); color: var(--accent); }
+
+  /* ── ROUTE LIST ──────────────────────────── */
+  #route-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-height: 100px;
+    max-height: 200px;
+  }
+  .route-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 6px;
+    background: #060d1e;
+    border-radius: 2px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    border: 1px solid transparent;
+  }
+  .route-item:hover { border-color: var(--border); }
+  .route-item .idx { color: var(--accent); width: 24px; text-align: right; }
+  .route-item .coord { flex: 1; color: var(--text); }
+  .route-item .rm { cursor: pointer; color: var(--fail); font-size: 12px; line-height: 1; }
+  .route-item .rm:hover { color: #fff; }
+
+  /* ── STAT BOXES ──────────────────────────── */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding: 10px 14px;
+  }
+  .stat-box {
+    background: #060d1e;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 8px 10px;
+  }
+  .stat-box .val {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 18px;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .stat-box .lbl { font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+  /* ── LEGEND ──────────────────────────────── */
+  .legend {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 8px 14px 12px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .legend-dot {
+    width: 12px; height: 12px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  /* ── IMPORT LOG AREA ─────────────────────── */
+  #import-area {
+    padding: 8px 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  #import-area .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 4px;
+    padding: 14px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  #import-area .drop-zone:hover, #import-area .drop-zone.drag-over {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,212,255,0.04);
+  }
+  #import-area .drop-zone input { display: none; }
+
+  /* ── TOOLTIP ─────────────────────────────── */
+  #tooltip {
+    position: fixed;
+    background: rgba(10,14,23,0.95);
+    border: 1px solid var(--accent);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    padding: 5px 9px;
+    border-radius: 3px;
+    pointer-events: none;
+    display: none;
+    z-index: 999;
+    line-height: 1.6;
+  }
+
+  /* ── ZOOM CONTROLS ───────────────────────── */
+  .zoom-ctrl {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .zoom-ctrl button {
+    width: 28px; height: 28px;
+    background: rgba(10,14,23,0.9);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    line-height: 1;
+  }
+  .zoom-ctrl button:hover { background: var(--accent); color: #000; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  .divider { height: 1px; background: var(--border); }
+  .pad { padding: 10px 14px; }
+  .mt6 { margin-top: 6px; }
+
+  #log-msg {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--pass);
+    padding: 4px 14px 8px;
+    min-height: 16px;
+  }
+
+  .route-path-select {
+    display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  }
+  .route-path-select .btn-sm { flex-shrink: 0; }
+
+  input[type=checkbox] {
+    accent-color: var(--accent);
+    width: 14px; height: 14px;
+    cursor: pointer;
+  }
+  .check-row {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; color: var(--muted); cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>◈ UF2000 MAP EDITOR</h1>
+  <span class="badge">v1.2-ULLD</span>
+  <div class="status-bar">
+    <span>TOTAL <b id="hd-total">0</b></span>
+    <span>ACTIVE <b id="hd-active">0</b></span>
+    <span>ROUTE <b id="hd-route">0</b></span>
+    <span>MODE <b id="hd-mode">SELECT</b></span>
+  </div>
+</header>
+
+<!-- LEFT PANEL -->
+<div id="left-panel">
+
+  <!-- Device -->
+  <div class="section">
+    <div class="section-title open" onclick="toggleSection(this)">Device Info</div>
+    <div class="section-body open">
+      <label><span>Device Name</span>
+        <input type="text" id="deviceName" value="M-LLD-35A-8" maxlength="16">
+      </label>
+      <label><span>Lot ID</span>
+        <input type="text" id="lotId" value="RK13834">
+      </label>
+      <label><span>Wafer ID</span>
+        <input type="text" id="waferId" value="RK13834-01">
+      </label>
+    </div>
+  </div>
+
+  <!-- Wafer -->
+  <div class="section">
+    <div class="section-title open" onclick="toggleSection(this)">Wafer Size</div>
+    <div class="section-body open">
+      <label><span>Wafer Diameter</span>
+        <select id="waferDiam">
+          <option value="100">100 mm (4")</option>
+          <option value="150" selected>150 mm (6")</option>
+          <option value="200">200 mm (8")</option>
+          <option value="300">300 mm (12")</option>
+        </select>
+      </label>
+      <label><span>Edge Exclusion (mm)</span>
+        <input type="number" id="edgeExcl" value="3" min="0" max="20" step="0.5">
+      </label>
+      <label><span>Flat/Notch Angle (°)</span>
+        <input type="number" id="flatAngle" value="0" min="0" max="360" step="45">
+      </label>
+      <label><span>Flat Width (mm, 0=notch)</span>
+        <input type="number" id="flatWidth" value="0" min="0" max="40" step="1">
+      </label>
+    </div>
+  </div>
+
+  <!-- Die Size -->
+  <div class="section">
+    <div class="section-title open" onclick="toggleSection(this)">Die Size</div>
+    <div class="section-body open">
+      <div class="row2">
+        <label><span>Die W (mm)</span>
+          <input type="number" id="dieW" value="4.62" min="0.1" max="50" step="0.01">
+        </label>
+        <label><span>Die H (mm)</span>
+          <input type="number" id="dieH" value="4.86" min="0.1" max="50" step="0.01">
+        </label>
+      </div>
+      <div class="row2">
+        <label><span>ScribeX (mm)</span>
+          <input type="number" id="scrX" value="0.08" min="0" max="2" step="0.01">
+        </label>
+        <label><span>ScribeY (mm)</span>
+          <input type="number" id="scrY" value="0.08" min="0" max="2" step="0.01">
+        </label>
+      </div>
+      <label><span>Wafer Center Address (XAdr, YAdr)</span>
+        <span style="font-size:10px;color:var(--muted)">Wafer center maps to this die address</span>
+      </label>
+      <div class="row2">
+        <input type="number" id="refX" value="21" min="0" max="999" title="Center die X address">
+        <input type="number" id="refY" value="21" min="0" max="999" title="Center die Y address">
+      </div>
+      <label><span>Address Origin Offset (XAdr₀, YAdr₀)</span>
+        <span style="font-size:10px;color:var(--muted)">Start address for die at grid (0,0)</span>
+      </label>
+      <div class="row2">
+        <input type="number" id="addrOffsetX" value="0" min="-999" max="999" title="X address offset">
+        <input type="number" id="addrOffsetY" value="0" min="-999" max="999" title="Y address offset">
+      </div>
+      <button class="btn btn-primary" onclick="buildWaferMap()">↻ REBUILD MAP</button>
+    </div>
+  </div>
+
+  <!-- Pad -->
+  <div class="section">
+    <div class="section-title" onclick="toggleSection(this)">Pad Config</div>
+    <div class="section-body">
+      <div class="row2">
+        <label><span>Pad W (µm)</span>
+          <input type="number" id="padW" value="120" min="10" max="500">
+        </label>
+        <label><span>Pad H (µm)</span>
+          <input type="number" id="padH" value="120" min="10" max="500">
+        </label>
+      </div>
+      <label><span>Pad Count</span>
+        <input type="number" id="padCount" value="2" min="1" max="32">
+      </label>
+      <label><span>Pad Pitch (µm)</span>
+        <input type="number" id="padPitch" value="12032" min="100" max="99999">
+      </label>
+    </div>
+  </div>
+
+  <!-- Route -->
+  <div class="section">
+    <div class="section-title" onclick="toggleSection(this)">Pick Route</div>
+    <div class="section-body">
+      <label><span>Scan Direction</span>
+        <select id="scanDir">
+          <option value="snakeX">Snake → (Row by Row)</option>
+          <option value="snakeY">Snake ↓ (Col by Col)</option>
+          <option value="spiralIn">Spiral Inward</option>
+          <option value="spiralOut">Spiral Outward</option>
+          <option value="manual">Manual (click to add)</option>
+        </select>
+      </label>
+      <label><span>Start Corner</span>
+        <select id="startCorner">
+          <option value="TL">Top-Left</option>
+          <option value="TR">Top-Right</option>
+          <option value="BL">Bottom-Left</option>
+          <option value="BR">Bottom-Right</option>
+        </select>
+      </label>
+      <label class="check-row">
+        <input type="checkbox" id="skipFail" checked>
+        <span>Skip fail dies (from log)</span>
+      </label>
+      <button class="btn btn-primary" onclick="applyRoute()">↻ APPLY ROUTE</button>
+      <button class="btn btn-warn btn-sm" onclick="clearRoute()">CLEAR ROUTE</button>
+    </div>
+  </div>
+
+  <!-- Import -->
+  <div class="section">
+    <div class="section-title" onclick="toggleSection(this)">Import Test Log</div>
+    <div class="section-body">
+      <div id="import-area">
+        <div class="drop-zone" id="drop-zone" onclick="document.getElementById('csvFile').click()">
+          <input type="file" id="csvFile" accept=".csv" onchange="importCSV(event)">
+          ▲ Click or drop test_log.csv<br>
+          <span style="font-size:10px;color:var(--muted)">Auto-reads XAdr/YAdr/Bin# columns<br>Bin=1 → Pass, other → Fail</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- CENTER: Wafer Map -->
+<div id="center">
+  <div id="wafer-wrap">
+    <canvas id="wafer-canvas" width="600" height="600"></canvas>
+    <div class="zoom-ctrl">
+      <button onclick="zoomIn()">+</button>
+      <button onclick="zoomOut()">−</button>
+      <button onclick="zoomFit()" title="Fit">⊡</button>
+    </div>
+  </div>
+  <div class="canvas-tools">
+    <div class="tool-mode">
+      <button class="active" id="tm-select" onclick="setToolMode('select')">SELECT</button>
+      <button id="tm-toggle" onclick="setToolMode('toggle')">TOGGLE</button>
+      <button id="tm-route" onclick="setToolMode('route')">ROUTE</button>
+      <button id="tm-erase" onclick="setToolMode('erase')">ERASE</button>
+    </div>
+    <button class="btn btn-sm btn-primary" onclick="selectAll()">ALL</button>
+    <button class="btn btn-sm btn-warn" onclick="invertSelection()">INV</button>
+    <button class="btn btn-sm btn-danger" onclick="deselectAll()">NONE</button>
+  </div>
+  <div id="tooltip"></div>
+</div>
+
+<!-- RIGHT PANEL -->
+<div id="right-panel">
+
+  <!-- Stats -->
+  <div class="section-title" style="cursor:default;">Statistics</div>
+  <div class="stat-grid">
+    <div class="stat-box"><div class="val" id="st-total">0</div><div class="lbl">Total Dies</div></div>
+    <div class="stat-box"><div class="val" id="st-active">0</div><div class="lbl">Active (Pass)</div></div>
+    <div class="stat-box"><div class="val" id="st-fail" style="color:var(--fail)">0</div><div class="lbl">Fail Dies</div></div>
+    <div class="stat-box"><div class="val" id="st-edge">0</div><div class="lbl">Edge Out</div></div>
+    <div class="stat-box"><div class="val" id="st-route">0</div><div class="lbl">Route Seq</div></div>
+    <div class="stat-box"><div class="val" id="st-pass-pct" style="color:var(--pass)">—</div><div class="lbl">Pass %</div></div>
+  </div>
+  <div class="divider"></div>
+
+  <!-- Legend -->
+  <div class="section-title" style="cursor:default;">Legend</div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#00e676"></div>Active (pick)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#546e8a"></div>Edge excluded</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ff1744"></div>Fail (from log)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ff6b35"></div>Route sequence</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#1a2332"></div>Outside wafer</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#1565c0;border:2px solid #42a5f5"></div>Selected</div>
+  </div>
+  <div class="divider"></div>
+
+  <!-- Route Sequence -->
+  <div class="section-title" style="cursor:default;">Route Sequence</div>
+  <div id="route-list"></div>
+  <div class="divider"></div>
+
+  <!-- Export -->
+  <div class="section-title" style="cursor:default;">Export .dat Files</div>
+  <div class="pad">
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button class="btn btn-success" onclick="exportAll()">⬇ EXPORT ALL .dat</button>
+      <div class="btn-group">
+        <button class="btn btn-sm btn-primary" onclick="exportFile('dieData')">dieData</button>
+        <button class="btn btn-sm btn-primary" onclick="exportFile('devParm')">devParm</button>
+        <button class="btn btn-sm btn-primary" onclick="exportFile('padData')">padData</button>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-sm btn-primary" onclick="exportFile('devList')">devList</button>
+        <button class="btn btn-sm btn-primary" onclick="exportFile('inspData')">inspData</button>
+        <button class="btn btn-sm btn-primary" onclick="exportFile('videoData')">videoData</button>
+        <button class="btn btn-sm btn-primary" onclick="exportFile('sampleData')">sampleData</button>
+      </div>
+    </div>
+  </div>
+  <div id="log-msg"></div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+const state = {
+  dies: [],          // {x, y, status:'active'|'edge'|'outside', selected, fail, routeIdx}
+  routeSeq: [],      // [{x,y}] ordered pick sequence
+  toolMode: 'select',
+  zoom: 1,
+  panX: 0,
+  panY: 0,
+  dragging: false,
+  dragStart: null,
+  selRect: null,
+  csvData: {},       // {x,y} -> bin
+};
+
+// Grid config
+let cfg = {
+  waferR: 75,       // mm radius (6" wafer default)
+  edgeExcl: 3,      // mm
+  dieW: 4.62,
+  dieH: 4.86,
+  scrX: 0.08,
+  scrY: 0.08,
+  refX: 21,         // wafer center XAdr
+  refY: 21,         // wafer center YAdr
+  flatAngle: 0,
+  flatWidth: 0,
+  addrOffsetX: 0,   // additional address offset
+  addrOffsetY: 0,
+};
+
+// Canvas
+const canvas = document.getElementById('wafer-canvas');
+const ctx = canvas.getContext('2d');
+let CELL = 16; // px per die (scaled)
+
+// ═══════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  buildWaferMap();
+  setupCanvasEvents();
+  setupDropZone();
+});
+
+function toggleSection(el) {
+  el.classList.toggle('open');
+  const body = el.nextElementSibling;
+  body.classList.toggle('open');
+}
+
+// ═══════════════════════════════════════════════════════
+//  WAFER MAP BUILDER
+// ═══════════════════════════════════════════════════════
+function buildWaferMap() {
+  const diam = parseInt(document.getElementById('waferDiam').value);
+  cfg.waferR = diam / 2;
+  cfg.edgeExcl = parseFloat(document.getElementById('edgeExcl').value);
+  cfg.dieW = parseFloat(document.getElementById('dieW').value);
+  cfg.dieH = parseFloat(document.getElementById('dieH').value);
+  cfg.scrX = parseFloat(document.getElementById('scrX').value) || 0;
+  cfg.scrY = parseFloat(document.getElementById('scrY').value) || 0;
+  cfg.refX = parseInt(document.getElementById('refX').value);
+  cfg.refY = parseInt(document.getElementById('refY').value);
+  if (isNaN(cfg.refX)) cfg.refX = 21;
+  if (isNaN(cfg.refY)) cfg.refY = 21;
+  cfg.flatAngle = parseInt(document.getElementById('flatAngle').value) || 0;
+  cfg.flatWidth = parseFloat(document.getElementById('flatWidth').value) || 0;
+  cfg.addrOffsetX = parseInt(document.getElementById('addrOffsetX').value) || 0;
+  cfg.addrOffsetY = parseInt(document.getElementById('addrOffsetY').value) || 0;
+
+  const stepX = cfg.dieW + cfg.scrX;
+  const stepY = cfg.dieH + cfg.scrY;
+  const activeR = cfg.waferR - cfg.edgeExcl;
+  const edgeR = cfg.waferR;
+
+  const maxCol = Math.ceil(cfg.waferR / stepX) + 2;
+  const maxRow = Math.ceil(cfg.waferR / stepY) + 2;
+
+  // Address offset: the die at grid position (col, row)=relative to wafer center
+  // has XAdr = col + cfg.refX + cfg.addrOffsetX
+  // When addrOffsetX=0, XAdr = col + refX (center die has XAdr=refX)
+
+  state.dies = [];
+  for (let row = -maxRow; row <= maxRow; row++) {
+    for (let col = -maxCol; col <= maxCol; col++) {
+      // Center of die in mm relative to wafer center
+      // refX/refY = wafer center address; die at (col,row) relative to center
+      const cx = col * stepX + stepX / 2;
+      const cy = row * stepY + stepY / 2;
+
+      // Check if any corner of die is within wafer
+      let minDist = Infinity;
+      for (const [dx, dy] of [[-1,-1],[-1,1],[1,-1],[1,1],[0,0]]) {
+        const px = cx + dx * cfg.dieW/2;
+        const py = cy + dy * cfg.dieH/2;
+        minDist = Math.min(minDist, Math.sqrt(px*px + py*py));
+      }
+      const maxCornerDist = Math.max(...[[-1,-1],[-1,1],[1,-1],[1,1]].map(([dx,dy]) => {
+        const px = cx + dx * cfg.dieW/2;
+        const py = cy + dy * cfg.dieH/2;
+        return Math.sqrt(px*px + py*py);
+      }));
+
+      if (minDist >= edgeR) continue; // entirely outside
+
+      // UF2000 XAdr/YAdr: absolute die address on wafer
+      // col=0 = wafer center column -> XAdr = refX
+      const xAdr = col + cfg.refX + cfg.addrOffsetX;
+      const yAdr = row + cfg.refY + cfg.addrOffsetY;
+
+      // Check flat/notch exclusion
+      let flatExcl = false;
+      if (cfg.flatWidth > 0) {
+        const fa = cfg.flatAngle * Math.PI / 180;
+        // Flat is a chord perpendicular to the flat angle direction
+        const proj = cx * Math.sin(fa) + cy * (-Math.cos(fa));
+        const flatD = cfg.waferR - cfg.flatWidth;
+        if (proj > flatD) flatExcl = true;
+      }
+
+      let status;
+      if (flatExcl) {
+        status = 'outside';
+      } else if (maxCornerDist > activeR) {
+        status = 'edge';
+      } else {
+        status = 'active';
+      }
+
+      // Check against CSV fail data
+      const csvBin = state.csvData[`${xAdr},${yAdr}`];
+      const fail = csvBin !== undefined && csvBin !== 1;
+
+      state.dies.push({ x: xAdr, y: yAdr, cx, cy, status, selected: status === 'active', fail, routeIdx: -1 });
+    }
+  }
+
+  // Re-apply any existing route
+  state.routeSeq = [];
+  updateStats();
+  zoomFit();
+  render();
+  const activeCnt = state.dies.filter(d=>d.status==='active').length;
+  const edgeCnt   = state.dies.filter(d=>d.status==='edge').length;
+  log('MAP rebuilt — Active: ' + activeCnt + '  Edge: ' + edgeCnt + '  Total: ' + (activeCnt+edgeCnt));
+}
+
+// ═══════════════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════════════
+function render() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  const gr = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W/2);
+  gr.addColorStop(0, '#0d1a2e');
+  gr.addColorStop(1, '#060d1e');
+  ctx.fillStyle = gr;
+  ctx.fillRect(0, 0, W, H);
+
+  if (!state.dies.length) return;
+
+  const stepX = cfg.dieW + cfg.scrX;
+  const stepY = cfg.dieH + cfg.scrY;
+
+  // Scale: fit wafer to canvas with zoom
+  const pxPerMm = CELL / Math.max(stepX, stepY) * state.zoom;
+  const cx0 = W / 2 + state.panX;
+  const cy0 = H / 2 + state.panY;
+
+  // Draw wafer circle
+  const waferPx = cfg.waferR * pxPerMm;
+  ctx.beginPath();
+  ctx.arc(cx0, cy0, waferPx, 0, Math.PI*2);
+  ctx.strokeStyle = '#1e3a5f';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Edge exclusion ring
+  const activeRpx = (cfg.waferR - cfg.edgeExcl) * pxPerMm;
+  ctx.beginPath();
+  ctx.arc(cx0, cy0, activeRpx, 0, Math.PI*2);
+  ctx.strokeStyle = '#1e2d4a';
+  ctx.lineWidth = 0.5;
+  ctx.setLineDash([4,4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Draw flat/notch indicator
+  if (cfg.flatWidth > 0) {
+    const fa = cfg.flatAngle * Math.PI / 180;
+    const flatD = (cfg.waferR - cfg.flatWidth) * pxPerMm;
+    const nx = Math.sin(fa), ny = -Math.cos(fa);
+    const px = cx0 + nx*flatD, py = cy0 + ny*flatD;
+    const tx = ny, ty = -nx;
+    const hw = Math.sqrt(Math.max(0, waferPx*waferPx - flatD*flatD));
+    ctx.beginPath();
+    ctx.moveTo(px + tx*hw, py + ty*hw);
+    ctx.lineTo(px - tx*hw, py - ty*hw);
+    ctx.strokeStyle = '#ff6b35';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  } else {
+    // Notch indicator
+    const fa = (cfg.flatAngle + 180) * Math.PI / 180;
+    const nx = Math.sin(fa), ny = -Math.cos(fa);
+    ctx.beginPath();
+    ctx.arc(cx0 + nx*waferPx, cy0 + ny*waferPx, 4, 0, Math.PI*2);
+    ctx.fillStyle = '#ff6b35';
+    ctx.fill();
+  }
+
+  // Die dimensions in pixels
+  const dw = cfg.dieW * pxPerMm;
+  const dh = cfg.dieH * pxPerMm;
+
+  // Sort so route-highlighted dies render on top
+  const sorted = [...state.dies].sort((a,b) => (a.routeIdx >= 0 ? 1 : 0) - (b.routeIdx >= 0 ? 1 : 0));
+
+  for (const die of sorted) {
+    const px = cx0 + die.cx * pxPerMm - dw/2;
+    const py = cy0 + die.cy * pxPerMm - dh/2;
+
+    if (px > W+dw || px+dw < -dw || py > H+dh || py+dh < -dh) continue;
+
+    let fillColor, strokeColor, strokeW = 0.5;
+
+    if (die.status === 'outside') continue;
+
+    if (die.status === 'edge') {
+      fillColor = '#1a2d3f';
+      strokeColor = '#243447';
+    } else if (die.fail) {
+      fillColor = '#3d0a0f';
+      strokeColor = '#ff1744';
+      strokeW = 1;
+    } else if (die.selected) {
+      fillColor = '#0a2840';
+      strokeColor = '#00e676';
+      strokeW = 1;
+    } else {
+      fillColor = '#0d1c30';
+      strokeColor = '#1e3a5f';
+    }
+
+    ctx.fillStyle = fillColor;
+    ctx.fillRect(px, py, dw, dh);
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = strokeW;
+    ctx.strokeRect(px, py, dw, dh);
+
+    // Route number overlay
+    if (die.routeIdx >= 0 && dw > 10) {
+      const alpha = Math.max(0.4, 1 - die.routeIdx / (state.routeSeq.length || 1) * 0.5);
+      ctx.fillStyle = `rgba(255,107,53,${alpha})`;
+      ctx.fillRect(px+1, py+1, dw-2, dh-2);
+      if (dw > 18 && dh > 10) {
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${Math.min(9, dh*0.5)}px Share Tech Mono, monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(die.routeIdx + 1, px + dw/2, py + dh/2);
+      }
+    }
+
+    // Fail X mark
+    if (die.fail && dw > 8) {
+      ctx.strokeStyle = '#ff1744';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(px+2, py+2); ctx.lineTo(px+dw-2, py+dh-2);
+      ctx.moveTo(px+dw-2, py+2); ctx.lineTo(px+2, py+dh-2);
+      ctx.stroke();
+    }
+
+    // Selection highlight
+    if (die.selected && die.status === 'active' && !die.fail) {
+      ctx.strokeStyle = '#00d4ff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px+1, py+1, dw-2, dh-2);
+    }
+  }
+
+  // Draw selection rectangle
+  if (state.selRect) {
+    const r = state.selRect;
+    ctx.strokeStyle = '#00d4ff';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3,3]);
+    ctx.strokeRect(r.x, r.y, r.w, r.h);
+    ctx.fillStyle = 'rgba(0,212,255,0.05)';
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.setLineDash([]);
+  }
+
+  // Route path lines
+  if (state.routeSeq.length > 1 && dw > 4) {
+    ctx.strokeStyle = 'rgba(255,107,53,0.3)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2,3]);
+    ctx.beginPath();
+    for (let i = 0; i < state.routeSeq.length; i++) {
+      const {x,y} = state.routeSeq[i];
+      const die = findDie(x,y);
+      if (!die) continue;
+      const px = cx0 + die.cx * pxPerMm;
+      const py = cy0 + die.cy * pxPerMm;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  updateStatusBar();
+}
+
+function findDie(x, y) {
+  return state.dies.find(d => d.x === x && d.y === y);
+}
+
+// ═══════════════════════════════════════════════════════
+//  CANVAS EVENTS
+// ═══════════════════════════════════════════════════════
+function setupCanvasEvents() {
+  canvas.addEventListener('mousedown', onMouseDown);
+  canvas.addEventListener('mousemove', onMouseMove);
+  canvas.addEventListener('mouseup', onMouseUp);
+  canvas.addEventListener('wheel', onWheel, {passive: false});
+  canvas.addEventListener('mouseleave', () => {
+    document.getElementById('tooltip').style.display = 'none';
+  });
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+}
+
+function getCanvasPos(e) {
+  const r = canvas.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+function canvasToDie(px, py) {
+  const stepX = cfg.dieW + cfg.scrX;
+  const stepY = cfg.dieH + cfg.scrY;
+  const pxPerMm = CELL / Math.max(stepX, stepY) * state.zoom;
+  const cx0 = canvas.width/2 + state.panX;
+  const cy0 = canvas.height/2 + state.panY;
+  const mmX = (px - cx0) / pxPerMm;
+  const mmY = (py - cy0) / pxPerMm;
+  // Which die contains this mm coordinate?
+  for (const d of state.dies) {
+    if (mmX >= d.cx - cfg.dieW/2 && mmX < d.cx + cfg.dieW/2 &&
+        mmY >= d.cy - cfg.dieH/2 && mmY < d.cy + cfg.dieH/2) return d;
+  }
+  return null;
+}
+
+let isDraggingPan = false;
+let lastPan = null;
+
+function onMouseDown(e) {
+  const pos = getCanvasPos(e);
+  if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    isDraggingPan = true;
+    lastPan = pos;
+    canvas.style.cursor = 'grabbing';
+    return;
+  }
+  if (e.button !== 0) return;
+
+  const die = canvasToDie(pos.x, pos.y);
+
+  if (state.toolMode === 'route') {
+    if (die && die.status === 'active' && !die.fail) {
+      addToRoute(die);
+    }
+    return;
+  }
+  if (state.toolMode === 'toggle') {
+    if (die && die.status === 'active' && !die.fail) {
+      die.selected = !die.selected;
+      updateStats(); render();
+    }
+    return;
+  }
+  if (state.toolMode === 'erase') {
+    if (die && die.routeIdx >= 0) {
+      removeFromRoute(die);
+    }
+    return;
+  }
+  // SELECT mode: start drag rect
+  if (state.toolMode === 'select') {
+    state.dragging = true;
+    state.dragStart = pos;
+    state.selRect = { x: pos.x, y: pos.y, w: 0, h: 0 };
+    // Single click deselect all then select clicked
+    if (!e.shiftKey) deselectAll(false);
+    if (die && die.status === 'active' && !die.fail) {
+      die.selected = true;
+    }
+    updateStats(); render();
+  }
+}
+
+function onMouseMove(e) {
+  const pos = getCanvasPos(e);
+
+  if (isDraggingPan) {
+    state.panX += pos.x - lastPan.x;
+    state.panY += pos.y - lastPan.y;
+    lastPan = pos;
+    render();
+    return;
+  }
+
+  const die = canvasToDie(pos.x, pos.y);
+  const tt = document.getElementById('tooltip');
+  if (die && die.status !== 'outside') {
+    tt.style.display = 'block';
+    tt.style.left = (e.clientX + 12) + 'px';
+    tt.style.top  = (e.clientY - 10) + 'px';
+    tt.innerHTML = `XAdr: ${die.x}  YAdr: ${die.y}<br>Status: ${die.status}${die.fail?' [FAIL]':''}${die.routeIdx>=0?' [#'+(die.routeIdx+1)+']':''}`;
+  } else {
+    tt.style.display = 'none';
+  }
+
+  if (state.dragging && state.toolMode === 'select') {
+    state.selRect = {
+      x: Math.min(pos.x, state.dragStart.x),
+      y: Math.min(pos.y, state.dragStart.y),
+      w: Math.abs(pos.x - state.dragStart.x),
+      h: Math.abs(pos.y - state.dragStart.y),
+    };
+    // Select dies in rect
+    for (const d of state.dies) {
+      if (d.status !== 'active' || d.fail) continue;
+      const stepX = cfg.dieW + cfg.scrX;
+      const stepY = cfg.dieH + cfg.scrY;
+      const pxPerMm = CELL / Math.max(stepX, stepY) * state.zoom;
+      const cx0 = canvas.width/2 + state.panX;
+      const cy0 = canvas.height/2 + state.panY;
+      const dpx = cx0 + d.cx * pxPerMm;
+      const dpy = cy0 + d.cy * pxPerMm;
+      d.selected = (dpx >= state.selRect.x && dpx <= state.selRect.x + state.selRect.w &&
+                    dpy >= state.selRect.y && dpy <= state.selRect.y + state.selRect.h);
+    }
+    updateStats(); render();
+  }
+}
+
+function onMouseUp(e) {
+  if (isDraggingPan) {
+    isDraggingPan = false;
+    canvas.style.cursor = 'crosshair';
+    return;
+  }
+  state.dragging = false;
+  state.selRect = null;
+  render();
+}
+
+function onWheel(e) {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.1 : 0.9;
+  state.zoom = Math.max(0.2, Math.min(20, state.zoom * factor));
+  render();
+}
+
+// ═══════════════════════════════════════════════════════
+//  TOOL MODES
+// ═══════════════════════════════════════════════════════
+function setToolMode(mode) {
+  state.toolMode = mode;
+  ['select','toggle','route','erase'].forEach(m => {
+    document.getElementById('tm-'+m).classList.toggle('active', m === mode);
+  });
+  document.getElementById('hd-mode').textContent = mode.toUpperCase();
+}
+
+function selectAll(render_=true) {
+  state.dies.forEach(d => { if (d.status==='active'&&!d.fail) d.selected = true; });
+  updateStats(); if(render_) render();
+}
+function deselectAll(render_=true) {
+  state.dies.forEach(d => d.selected = false);
+  updateStats(); if(render_) render();
+}
+function invertSelection() {
+  state.dies.forEach(d => { if(d.status==='active'&&!d.fail) d.selected = !d.selected; });
+  updateStats(); render();
+}
+
+// ═══════════════════════════════════════════════════════
+//  ROUTE
+// ═══════════════════════════════════════════════════════
+function applyRoute() {
+  const dir = document.getElementById('scanDir').value;
+  const corner = document.getElementById('startCorner').value;
+  const skipFail = document.getElementById('skipFail').checked;
+
+  let candidates = state.dies.filter(d =>
+    d.status === 'active' && d.selected && (!skipFail || !d.fail)
+  );
+
+  if (dir === 'manual') { log('Route mode: MANUAL — click dies on canvas'); setToolMode('route'); return; }
+
+  const xs = candidates.map(d => d.x);
+  const ys = candidates.map(d => d.y);
+  if (!xs.length) { log('No active selected dies to route'); return; }
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+
+  // Build ordered sequence
+  let seq = [];
+  if (dir === 'snakeX') {
+    // Row-by-row snake scan
+    const rows = {};
+    candidates.forEach(d => { (rows[d.y] = rows[d.y]||[]).push(d); });
+    let rowKeys = Object.keys(rows).map(Number).sort((a,b)=>a-b);
+    const startBottom = (corner === 'BL' || corner === 'BR');
+    const startRight  = (corner === 'TR' || corner === 'BR');
+    if (startBottom) rowKeys.reverse();
+    rowKeys.forEach((ry, i) => {
+      const row = rows[ry].sort((a,b) => a.x - b.x);
+      // Row 0 goes right-to-left when startRight; subsequent rows alternate (snake)
+      const goLeft = startRight ? (i % 2 === 0) : (i % 2 === 1);
+      seq.push(...(goLeft ? [...row].reverse() : row));
+    });
+  } else if (dir === 'snakeY') {
+    // Column-by-column snake scan
+    const cols = {};
+    candidates.forEach(d => { (cols[d.x] = cols[d.x]||[]).push(d); });
+    let colKeys = Object.keys(cols).map(Number).sort((a,b)=>a-b);
+    const startRight  = (corner === 'TR' || corner === 'BR');
+    const startBottom = (corner === 'BL' || corner === 'BR');
+    if (startRight) colKeys.reverse();
+    colKeys.forEach((cx, i) => {
+      const col = cols[cx].sort((a,b) => a.y - b.y);
+      // Col 0 goes bottom-to-top when startBottom; subsequent cols alternate
+      const goUp = startBottom ? (i % 2 === 0) : (i % 2 === 1);
+      seq.push(...(goUp ? [...col].reverse() : col));
+    });
+  } else if (dir === 'spiralIn' || dir === 'spiralOut') {
+    seq = spiralSort(candidates, dir === 'spiralIn');
+  }
+
+  // Apply route
+  clearRoute(false);
+  seq.forEach((d, i) => {
+    d.routeIdx = i;
+    state.routeSeq.push({x: d.x, y: d.y});
+  });
+
+  updateRouteList();
+  updateStats();
+  render();
+  log(`Route applied: ${seq.length} dies (${dir})`);
+}
+
+function spiralSort(dies, inward) {
+  // Sort by spiral layers (distance from center, then angle)
+  const sorted = [...dies].sort((a,b) => {
+    const da = Math.sqrt(a.cx*a.cx + a.cy*a.cy);
+    const db = Math.sqrt(b.cx*b.cx + b.cy*b.cy);
+    if (Math.abs(da-db) > 1) return inward ? db-da : da-db;
+    const angA = Math.atan2(a.cy, a.cx);
+    const angB = Math.atan2(b.cy, b.cx);
+    return angA - angB;
+  });
+  return sorted;
+}
+
+function addToRoute(die) {
+  if (die.routeIdx >= 0) return;
+  die.routeIdx = state.routeSeq.length;
+  state.routeSeq.push({x: die.x, y: die.y});
+  updateRouteList();
+  updateStats();
+  render();
+}
+
+function removeFromRoute(die) {
+  if (die.routeIdx < 0) return;
+  state.routeSeq.splice(die.routeIdx, 1);
+  // Reindex
+  state.routeSeq.forEach((r, i) => {
+    const d = findDie(r.x, r.y);
+    if (d) d.routeIdx = i;
+  });
+  die.routeIdx = -1;
+  updateRouteList();
+  updateStats();
+  render();
+}
+
+function clearRoute(render_=true) {
+  state.routeSeq = [];
+  state.dies.forEach(d => d.routeIdx = -1);
+  updateRouteList();
+  updateStats();
+  if(render_) render();
+}
+
+function updateRouteList() {
+  const el = document.getElementById('route-list');
+  el.innerHTML = '';
+  state.routeSeq.slice(0, 100).forEach((r, i) => {
+    const div = document.createElement('div');
+    div.className = 'route-item';
+    div.innerHTML = `<span class="idx">${i+1}</span><span class="coord">X=${r.x} Y=${r.y}</span><span class="rm" onclick="removeRouteItem(${i})">×</span>`;
+    el.appendChild(div);
+  });
+  if (state.routeSeq.length > 100) {
+    const more = document.createElement('div');
+    more.className = 'route-item';
+    more.innerHTML = `<span class="coord" style="color:var(--muted)">... +${state.routeSeq.length-100} more</span>`;
+    el.appendChild(more);
+  }
+}
+
+function removeRouteItem(idx) {
+  const die = findDie(state.routeSeq[idx].x, state.routeSeq[idx].y);
+  if (die) die.routeIdx = -1;
+  state.routeSeq.splice(idx, 1);
+  state.routeSeq.forEach((r, i) => {
+    const d = findDie(r.x, r.y); if(d) d.routeIdx = i;
+  });
+  updateRouteList(); updateStats(); render();
+}
+
+// ═══════════════════════════════════════════════════════
+//  ZOOM
+// ═══════════════════════════════════════════════════════
+function zoomIn()  { state.zoom = Math.min(20, state.zoom * 1.3); render(); }
+function zoomOut() { state.zoom = Math.max(0.2, state.zoom / 1.3); render(); }
+function zoomFit() {
+  state.panX = 0; state.panY = 0;
+  const stepX = cfg.dieW + cfg.scrX;
+  const stepY = cfg.dieH + cfg.scrY;
+  const maxD = Math.max(stepX, stepY);
+  const waferPxNeeded = cfg.waferR * 2 / maxD * CELL;
+  state.zoom = (Math.min(canvas.width, canvas.height) * 0.88) / waferPxNeeded;
+  render();
+}
+
+// ═══════════════════════════════════════════════════════
+//  CSV IMPORT
+// ═══════════════════════════════════════════════════════
+function setupDropZone() {
+  const dz = document.getElementById('drop-zone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) parseCSVFile(file);
+  });
+}
+
+function importCSV(e) {
+  const file = e.target.files[0];
+  if (file) parseCSVFile(file);
+}
+
+function parseCSVFile(file) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const text = ev.target.result;
+    const lines = text.split(/\r?\n/);
+    let headerIdx = -1;
+    let xIdx = -1, yIdx = -1, binIdx = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes('XAdr') && lines[i].includes('YAdr')) {
+        headerIdx = i;
+        const cols = lines[i].split(',');
+        xIdx = cols.findIndex(c => c.trim() === 'XAdr');
+        yIdx = cols.findIndex(c => c.trim() === 'YAdr');
+        binIdx = cols.findIndex(c => c.trim() === 'Bin#');
+        break;
+      }
+    }
+    if (headerIdx < 0) { log('ERROR: XAdr/YAdr columns not found'); return; }
+    state.csvData = {};
+    let count = 0;
+    for (let i = headerIdx+1; i < lines.length; i++) {
+      const parts = lines[i].split(',');
+      if (parts.length <= Math.max(xIdx,yIdx,binIdx)) continue;
+      const x = parseInt(parts[xIdx]), y = parseInt(parts[yIdx]);
+      const bin = parseInt(parts[binIdx]) || 1;
+      if (!isNaN(x) && !isNaN(y)) {
+        state.csvData[`${x},${y}`] = bin;
+        count++;
+      }
+    }
+    // Update fail status on existing dies
+    state.dies.forEach(d => {
+      const b = state.csvData[`${d.x},${d.y}`];
+      d.fail = b !== undefined && b !== 1;
+    });
+    updateStats(); render();
+    log(`CSV loaded: ${count} dies, ${Object.values(state.csvData).filter(b=>b!==1).length} fails`);
+  };
+  reader.readAsText(file, 'iso-8859-1');
+}
+
+// ═══════════════════════════════════════════════════════
+//  STATS
+// ═══════════════════════════════════════════════════════
+function updateStats() {
+  const total  = state.dies.filter(d=>d.status!=='outside').length;
+  const active = state.dies.filter(d=>d.status==='active').length;
+  const edge   = state.dies.filter(d=>d.status==='edge').length;
+  const fails  = state.dies.filter(d=>d.fail).length;
+  const passes = state.dies.filter(d=>d.status==='active' && !d.fail).length;
+  const route  = state.routeSeq.length;
+  const pct    = total > 0 ? (passes/active*100).toFixed(1) : '—';
+  document.getElementById('st-total').textContent    = total;
+  document.getElementById('st-active').textContent   = passes;
+  document.getElementById('st-fail').textContent     = fails;
+  document.getElementById('st-edge').textContent     = edge;
+  document.getElementById('st-route').textContent    = route;
+  document.getElementById('st-pass-pct').textContent = fails > 0 ? pct + '%' : '—';
+  document.getElementById('hd-total').textContent    = total;
+  document.getElementById('hd-active').textContent   = passes;
+  document.getElementById('hd-route').textContent    = route;
+}
+
+function updateStatusBar() {}
+
+// ═══════════════════════════════════════════════════════
+//  LOG
+// ═══════════════════════════════════════════════════════
+function log(msg) {
+  const el = document.getElementById('log-msg');
+  el.textContent = '▸ ' + msg;
+  setTimeout(() => { if(el.textContent.includes(msg)) el.textContent=''; }, 6000);
+}
+
+// ═══════════════════════════════════════════════════════
+//  EXPORT .dat FILES
+// ═══════════════════════════════════════════════════════
+function exportAll() {
+  ['dieData','devParm','padData','devList','inspData','videoData','sampleData'].forEach(exportFile);
+  log('All .dat files exported');
+}
+
+function exportFile(type) {
+  let buf;
+  switch(type) {
+    case 'dieData':  buf = buildDieData();  break;
+    case 'devParm':  buf = buildDevParm();  break;
+    case 'padData':  buf = buildPadData();  break;
+    case 'devList':  buf = buildDevList();  break;
+    case 'inspData': buf = buildInspData(); break;
+    case 'sampleData': buf = buildSampleData(); break;
+    case 'videoData':buf = buildVideoData();break;
+    default: return;
+  }
+  downloadBin(buf, type + '.dat');
+  log(type + '.dat exported (' + buf.length + ' bytes)');
+}
+
+// ── dieData.dat ─────────────────────────────────────────
+// Format: 4-byte records [0x00][XAdr][status][YAdr]
+// Status codes (reverse-engineered from ULLD reference):
+//   0x40 = active / pick die (fully inside active zone)
+//   0x80 = fringe die (partially overlaps edge exclusion boundary)
+//   0x02 = edge-excluded die (outside active zone but inside wafer)
+//   0x10 = fail die (from test log)
+//   0x00 = inactive / non-pick active die
+function buildDieData() {
+  // Collect all non-outside dies, sort by Y then X
+  const diesToWrite = state.dies.filter(d => d.status !== 'outside');
+  diesToWrite.sort((a,b) => a.y !== b.y ? a.y-b.y : a.x-b.x);
+
+  const buf = new Uint8Array(diesToWrite.length * 4);
+  diesToWrite.forEach((d, i) => {
+    let status;
+    if (d.status === 'edge') {
+      // Distinguish full-edge (0x02) from fringe/partial (0x80):
+      // fringe = die centre is outside active radius but ≤1 die-step from it
+      const stepX = cfg.dieW + cfg.scrX;
+      const stepY = cfg.dieH + cfg.scrY;
+      const activeR = cfg.waferR - cfg.edgeExcl;
+      const distFromCenter = Math.sqrt(d.cx * d.cx + d.cy * d.cy);
+      const fringeThresh = activeR + Math.max(stepX, stepY);
+      status = distFromCenter <= fringeThresh ? 0x80 : 0x02;
+    } else if (d.fail) {
+      status = 0x10;                        // fail
+    } else if (d.selected && !d.fail) {
+      status = 0x40;                        // active pick die
+    } else {
+      status = 0x00;                        // non-pick active die
+    }
+
+    buf[i*4+0] = 0x00;
+    buf[i*4+1] = d.x & 0xFF;
+    buf[i*4+2] = status;
+    buf[i*4+3] = d.y & 0xFF;
+  });
+  return buf;
+}
+
+// ── devParm.dat ──────────────────────────────────────────
+// Binary parameter file: 14443 bytes, fixed fields at known offsets
+// Key corrections vs original:
+//   Offsets 20/24: ULLD reference uses 480000/520000 (not waferR×10000)
+//   These appear to be non-radius machine calibration constants.
+function buildDevParm() {
+  const SIZE = 14443;
+  const buf = new Uint8Array(SIZE);
+  const dv = new DataView(buf.buffer);
+
+  // Device name at offset 0 (16 bytes, space-padded)
+  const name = (document.getElementById('deviceName').value || 'DEVICE').padEnd(16,' ').slice(0,16);
+  for (let i = 0; i < 16; i++) buf[i] = name.charCodeAt(i);
+
+  // Offset 16: uint16 = 60 (from ULLD reference)
+  dv.setUint16(16, 60, false);
+
+  // Offsets 20/24: ULLD calibration constants (NOT waferR×10000)
+  // ULLD reference: 480000 (0x000753_00) and 520000 (0x0007EF_40)
+  dv.setUint32(20, 480000, false);
+  dv.setUint32(24, 520000, false);
+
+  // Flat/notch angle
+  dv.setUint16(30, cfg.flatAngle || 0, false);
+
+  // Die pitch (in 0.1µm units: 1mm = 10000 units)
+  const dieStepX = Math.round((cfg.dieW + cfg.scrX) * 10000);
+  const dieStepY = Math.round((cfg.dieH + cfg.scrY) * 10000);
+  dv.setUint32(40, dieStepX, false);
+  dv.setUint32(44, dieStepY, false);
+
+  return buf;
+}
+
+// ── padData.dat ──────────────────────────────────────────
+// 24-byte pad configuration
+// ULLD reference bytes: 0002807f 00035ceb 0078 0078 0000 5200 ff00 ff10 00000000
+// Note: original code hardcoded LLD device values (-209599/-209769) which are WRONG for ULLD.
+// Offsets 8-9 = pad width (0x0078=120µm), offsets 10-11 = pad height.
+function buildPadData() {
+  const buf = new Uint8Array(24);
+  const dv = new DataView(buf.buffer);
+  const padW = parseInt(document.getElementById('padW').value) || 120; // µm
+  const padH = parseInt(document.getElementById('padH').value) || 120;
+
+  // ULLD reference offset values (raw encoder units)
+  dv.setInt32(0,  163967, false);   // pad1 offset (ULLD reference: 0x0002807f)
+  dv.setInt32(4,  220395, false);   // pad2 offset (ULLD reference: 0x00035ceb)
+  dv.setUint16(8,  padW & 0xFFFF, false); // pad width
+  dv.setUint16(10, padH & 0xFFFF, false); // pad height
+  dv.setUint16(12, 0x0000, false);
+  dv.setUint16(14, 0x5200, false);  // ULLD reference: 0x5200 (not pitch)
+  dv.setUint16(16, 0xFF00, false);
+  dv.setUint16(18, 0xFF10, false);
+  dv.setUint32(20, 0, false);
+  return buf;
+}
+
+// ── sampleData.dat ───────────────────────────────────────
+// 356 bytes — wafer boundary sample points (2-byte X/Y pairs tracing wafer edge)
+// This file is present in ULLD but was missing from the original HTML.
+// Generates a 89-point approximation of the wafer circle edge.
+function buildSampleData() {
+  const points = 89;
+  const buf = new Uint8Array(points * 4);
+  const dv = new DataView(buf.buffer);
+  // Sample wafer boundary as (XAdr, YAdr) die-address coordinates
+  // Using the ULLD reference: center ~(19,19), radius ~13 address units
+  const cx = cfg.refX, cy = cfg.refY;
+  const stepX = cfg.dieW + cfg.scrX;
+  const stepY = cfg.dieH + cfg.scrY;
+  const rX = Math.round((cfg.waferR - cfg.edgeExcl) / stepX);
+  const rY = Math.round((cfg.waferR - cfg.edgeExcl) / stepY);
+  for (let i = 0; i < points; i++) {
+    const ang = (i / points) * 2 * Math.PI;
+    const x = Math.round(cx + rX * Math.cos(ang));
+    const y = Math.round(cy + rY * Math.sin(ang));
+    dv.setUint16(i*4,   x & 0xFFFF, false);
+    dv.setUint16(i*4+2, y & 0xFFFF, false);
+  }
+  return buf;
+}
+
+// ── inspData.dat ─────────────────────────────────────────
+// 8 bytes, all zeros in reference
+function buildInspData() {
+  return new Uint8Array(8);
+}
+
+// ── devList.dat ──────────────────────────────────────────
+// Format (reverse-engineered from ULLD reference):
+//   Entry 0 (header): [0x0000][uint16 BE count = 922]  → 4 bytes
+//   Entries 1-922:    [uint16 BE paramID][uint8 type][uint8 size]  → 4 bytes each
+//   Total: 923 × 4 = 3692 bytes  ✓ matches ULLD reference
+// Note: original code incorrectly used 3-byte entries and a separate 4-byte header.
+function buildDevList() {
+  const n = 922;
+  const buf = new Uint8Array((n + 1) * 4);  // 923 × 4 = 3692 bytes
+  const dv = new DataView(buf.buffer);
+
+  // Entry 0: header [0x0000][uint16 count]
+  dv.setUint16(0, 0x0000, false);
+  dv.setUint16(2, n, false);
+
+  // Entries 1-922: [paramID][type][size] — sequential IDs 0x0001..0x039A
+  // Type 0x20 = standard parameter, size codes: 1/2/4 bytes
+  // Pattern inferred from reference: IDs 1-922, type 0x20, alternating sizes
+  const sizePattern = [1, 2, 4, 2, 4, 1, 1, 2, 2, 2, 1, 1, 1, 1, 4]; // repeating
+  for (let i = 1; i <= n; i++) {
+    const off = i * 4;
+    dv.setUint16(off, i, false);                                   // paramID
+    dv.setUint8(off + 2, 0x20);                                    // type
+    dv.setUint8(off + 3, sizePattern[(i - 1) % sizePattern.length]); // size
+  }
+  return buf;
+}
+
+// ── videoData.dat ────────────────────────────────────────
+// 40064 bytes — video/camera parameters (ULLD reference size)
+// WARNING: original code used 14976 bytes which is WRONG for ULLD products.
+// The correct size for ULLD is 40064 bytes.
+function buildVideoData() {
+  const buf = new Uint8Array(40064);
+  // Version string at offset 0 (matches ULLD reference: "3.00")
+  const ver = '3.00';
+  for (let i = 0; i < 4; i++) buf[i] = ver.charCodeAt(i) || 0;
+  // Offset 12: set 0x02 flag (observed in ULLD reference)
+  buf[12] = 0x02;
+  // Remaining bytes are zero; production use should preserve exact reference bytes
+  return buf;
+}
+
+// ── Download helper ──────────────────────────────────────
+function downloadBin(uint8arr, filename) {
+  const blob = new Blob([uint8arr], {type: 'application/octet-stream'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+</script>
+</body>
+</html>
