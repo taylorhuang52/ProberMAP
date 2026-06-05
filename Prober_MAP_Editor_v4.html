@@ -166,9 +166,234 @@
             border-color: #a855f7;
             background: rgba(168,85,247,0.08);
         }
+
+        /* ═══════════════════════════════════════
+           LOGIN OVERLAY
+        ═══════════════════════════════════════ */
+        #loginOverlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: #0a0a14;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+        }
+        #loginOverlay.hidden { display: none; }
+
+        /* CRT 掃描線 */
+        #loginOverlay::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,0.18) 2px,
+                rgba(0,0,0,0.18) 4px
+            );
+            pointer-events: none;
+            z-index: 1;
+        }
+        /* 暗角 vignette */
+        #loginOverlay::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.65) 100%);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .login-box {
+            position: relative;
+            z-index: 2;
+            width: 420px;
+            border: 1px solid #00d4ff44;
+            background: rgba(10,10,30,0.85);
+            padding: 40px 44px 36px;
+            box-shadow: 0 0 60px #00d4ff22, inset 0 0 40px rgba(0,212,255,0.04);
+        }
+        .login-box::before {
+            content: '';
+            position: absolute;
+            top: -1px; left: -1px; right: -1px;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #00d4ff, transparent);
+        }
+
+        .login-logo {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .login-logo .brand {
+            font-size: 0.7rem;
+            letter-spacing: 0.35em;
+            color: #00d4ff88;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .login-logo .title {
+            font-size: 1.25rem;
+            color: #00d4ff;
+            letter-spacing: 0.12em;
+            text-shadow: 0 0 20px #00d4ff80;
+        }
+        .login-logo .subtitle {
+            font-size: 0.68rem;
+            color: #556;
+            letter-spacing: 0.2em;
+            margin-top: 5px;
+        }
+
+        .login-prompt {
+            font-size: 0.75rem;
+            color: #00d4ff66;
+            letter-spacing: 0.1em;
+            margin-bottom: 6px;
+        }
+        .login-prompt span { color: #00d4ffaa; }
+
+        .login-field {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #00d4ff33;
+            background: rgba(0,212,255,0.04);
+            padding: 10px 14px;
+            margin-bottom: 18px;
+        }
+        .login-field:focus-within {
+            border-color: #00d4ff88;
+            box-shadow: 0 0 12px #00d4ff22;
+        }
+        .field-prefix {
+            color: #00d4ff;
+            font-size: 0.85rem;
+            user-select: none;
+            flex-shrink: 0;
+        }
+        #pwdInput {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #00d4ff;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            letter-spacing: 0.12em;
+            caret-color: #00d4ff;
+        }
+        #pwdInput::placeholder { color: #00d4ff30; }
+
+        .login-btn {
+            width: 100%;
+            padding: 11px;
+            background: transparent;
+            border: 1px solid #00d4ff66;
+            color: #00d4ff;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.25s;
+        }
+        .login-btn:hover {
+            background: rgba(0,212,255,0.12);
+            border-color: #00d4ff;
+            box-shadow: 0 0 20px #00d4ff33;
+            color: #fff;
+        }
+        .login-btn:active { transform: scale(0.98); }
+
+        .login-error {
+            font-size: 0.7rem;
+            color: #ff1744;
+            letter-spacing: 0.1em;
+            margin-top: 10px;
+            min-height: 16px;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .login-error.show { opacity: 1; }
+
+        .login-footer {
+            text-align: center;
+            margin-top: 28px;
+            font-size: 0.6rem;
+            color: #33445566;
+            letter-spacing: 0.2em;
+        }
+
+        /* 閃爍游標動畫 */
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+        .cursor { display: inline-block; width: 8px; height: 14px; background: #00d4ff; vertical-align: middle; animation: blink 1s step-end infinite; margin-left: 2px; }
+
+        /* 解鎖成功動畫 */
+        @keyframes fadeOut { to { opacity: 0; pointer-events: none; } }
+        #loginOverlay.unlocking {
+            animation: fadeOut 0.6s ease 0.2s forwards;
+        }
+        @keyframes scanIn {
+            from { clip-path: inset(0 0 100% 0); opacity: 0; }
+            to   { clip-path: inset(0 0 0% 0);   opacity: 1; }
+        }
+        .login-box {
+            animation: scanIn 0.5s cubic-bezier(0.16,1,0.3,1) forwards;
+        }
+
+        /* 背景動態網格 */
+        .login-grid {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            background-image:
+                linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+            background-size: 40px 40px;
+            mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+        }
     </style>
 </head>
 <body>
+
+<!-- ══════════════════════════════════════════════
+     LOGIN OVERLAY
+══════════════════════════════════════════════ -->
+<div id="loginOverlay">
+    <div class="login-grid"></div>
+    <div class="login-box">
+        <div class="login-logo">
+            <div class="brand">Semiconductor Test Equipment</div>
+            <div class="title">PROBER MAP EDITOR</div>
+            <div class="subtitle">v4.0 · SECURE ACCESS REQUIRED</div>
+        </div>
+
+        <div class="login-prompt">
+            <span>SYSTEM</span> — Enter Authorization Code
+        </div>
+
+        <div class="login-field">
+            <span class="field-prefix">PWD&gt;</span>
+            <input type="password" id="pwdInput" placeholder="••••••••" autocomplete="off" maxlength="32">
+            <span class="cursor"></span>
+        </div>
+
+        <button class="login-btn" onclick="doLogin()">▶ &nbsp; Authenticate</button>
+        <div class="login-error" id="loginError">⚠ ACCESS DENIED — Invalid password</div>
+
+        <div class="login-footer">
+            AUTHORIZED PERSONNEL ONLY · MAP SYSTEM 2026
+        </div>
+    </div>
+</div>
+
 
 <header>
     <h1>Prober MAP Editor v4.0 (匯入/匯出機台格式)</h1>
@@ -285,6 +510,12 @@ const PARAM_SCHEMA = {
 let config = { modelType: 'UF2000_ULLD', rows: 32, cols: 32, flatAngle: 180 };
 // 機台座標（匯入時從 footer 讀取，匯出時原樣寫回）
 let machineCoord = { ...COORD_OFFSET['UF2000_ULLD'] };
+// 機台額外 dat 檔（匯入時原樣保留，匯出時一起打包）
+let extraDat = {
+    inspData:   new Uint8Array(8),    // 全新時 = 8×0x00
+    padData:    new Uint8Array(24),   // 全新時 = 24×0x00
+    sampleData: new Uint8Array(0)     // 全新時 = 空
+};
 let mapGrid = [];
 const cellSize = 14;
 const canvas  = document.getElementById('mapCanvas');
@@ -374,6 +605,11 @@ function updateInfoBox() {
         if (cell.status === 'active') { cell.fail ? fail++ : pass++; }
         else skip++;
     }));
+    const extraStatus = [
+        extraDat.inspData.length   > 0 ? `inspData   ${extraDat.inspData.length}B ✅`   : `inspData   (空) ⚪`,
+        extraDat.padData.length    > 0 ? `padData    ${extraDat.padData.length}B ✅`    : `padData    (空) ⚪`,
+        extraDat.sampleData.length > 0 ? `sampleData ${extraDat.sampleData.length}B ✅` : `sampleData (無) ⚪`,
+    ].join('\n  ');
     document.getElementById('infoBox').innerText =
         `【配置】\n機台: ${config.modelType}\n` +
         `矩陣: ${config.rows} × ${config.cols}\n` +
@@ -381,7 +617,8 @@ function updateInfoBox() {
         `【統計】\n★ 測試中 (Active): ${pass + fail}\n` +
         `  └ 良品 Pass (0x40): ${pass}\n` +
         `  └ 不良 Fail (0x01): ${fail}\n` +
-        `★ 不測試 Skip: ${skip}`;
+        `★ 不測試 Skip: ${skip}\n\n` +
+        `【額外檔案】\n  ${extraStatus}`;
 }
 
 // ── Checksum (16-bit 補碼) ───────────────────────────────
@@ -526,13 +763,25 @@ function importZip(file) {
         // 同時嘗試讀取 devParm.dat（可選）
         const parmFile = zip.file('devParm.dat');
 
+        const inspFile   = zip.file('inspData.dat');
+        const padFile    = zip.file('padData.dat');
+        const sampleFile = zip.file('sampleData.dat');
+
         const promises = [
             dieFile.async('uint8array'),
-            parmFile ? parmFile.async('uint8array') : Promise.resolve(null)
+            parmFile   ? parmFile.async('uint8array')   : Promise.resolve(null),
+            inspFile   ? inspFile.async('uint8array')   : Promise.resolve(null),
+            padFile    ? padFile.async('uint8array')    : Promise.resolve(null),
+            sampleFile ? sampleFile.async('uint8array') : Promise.resolve(null)
         ];
 
-        Promise.all(promises).then(([dieBytes, parmBytes]) => {
+        Promise.all(promises).then(([dieBytes, parmBytes, inspBytes, padBytes, sampleBytes]) => {
             try {
+                // 保留額外檔案（原樣不動）
+                if (inspBytes)   extraDat.inspData   = inspBytes;
+                if (padBytes)    extraDat.padData     = padBytes;
+                if (sampleBytes) extraDat.sampleData  = sampleBytes;
+
                 importDieData(dieBytes, parmBytes);
                 setStatus('✅ 匯入成功！');
             } catch(e) {
@@ -681,11 +930,16 @@ function exportProductZip() {
     setStatus('正在打包…');
     const zip = new JSZip();
 
-    zip.file('dieData.dat',  buildDieData());
-    zip.file('devParm.dat',  buildDevParm());
-    zip.file('devList.dat',  buildDevList());
+    zip.file('dieData.dat',   buildDieData());
+    zip.file('devParm.dat',   buildDevParm());
+    zip.file('devList.dat',   buildDevList());
     zip.file('videoData.dat', buildGenericData(0x40));
     zip.file('opParm.dat',    buildGenericData(0x50));
+    // 機台額外檔案：原樣寫回（全新建立時為空/零）
+    zip.file('inspData.dat',   extraDat.inspData);
+    zip.file('padData.dat',    extraDat.padData);
+    if (extraDat.sampleData.length > 0)
+        zip.file('sampleData.dat', extraDat.sampleData);
 
     zip.generateAsync({ type: 'blob' }).then(content => {
         const a = document.createElement('a');
@@ -699,6 +953,39 @@ function exportProductZip() {
 }
 
 // ── 初始化 ────────────────────────────────────────────────
+
+// ── 登入邏輯 ─────────────────────────────────────────────
+const LOGIN_PWD = 'MAP2026';
+
+function doLogin() {
+    const val = document.getElementById('pwdInput').value;
+    const err = document.getElementById('loginError');
+    if (val === LOGIN_PWD) {
+        document.getElementById('loginOverlay').classList.add('unlocking');
+        setTimeout(() => {
+            document.getElementById('loginOverlay').classList.add('hidden');
+        }, 800);
+    } else {
+        err.classList.add('show');
+        document.getElementById('pwdInput').value = '';
+        document.getElementById('pwdInput').focus();
+        const box = document.querySelector('.login-box');
+        box.style.animation = 'none';
+        box.style.transform = 'translateX(-8px)';
+        setTimeout(() => { box.style.transform = 'translateX(8px)'; }, 60);
+        setTimeout(() => { box.style.transform = 'translateX(-5px)'; }, 120);
+        setTimeout(() => { box.style.transform = 'translateX(0)'; }, 180);
+        setTimeout(() => { err.classList.remove('show'); }, 2500);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('pwdInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') doLogin();
+    });
+    document.getElementById('pwdInput').focus();
+});
+
 window.onload = function() {
     initMapGrid();
     drawMap();
