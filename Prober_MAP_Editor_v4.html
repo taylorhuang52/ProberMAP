@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prober MAP Editor v4.0</title>
+    <title>Prober MAP Editor v4.0 (支援匯入/匯出機台格式)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         :root {
@@ -50,7 +50,7 @@
             padding: 15px;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 12px;
             overflow-y: auto;
         }
         .canvas-container {
@@ -91,38 +91,57 @@
             transition: background 0.2s;
         }
         button:hover { background-color: #00b4d8; }
+        button.btn-import {
+            background-color: #a855f7;
+            color: #fff;
+        }
+        button.btn-import:hover { background-color: #9333ea; }
+        button.btn-danger {
+            background-color: #ff1744;
+            color: #fff;
+        }
+        button.btn-danger:hover { background-color: #d50000; }
+        .section-title {
+            font-size: 0.78rem;
+            font-weight: bold;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 4px;
+            margin-bottom: 2px;
+        }
         .info-box {
             background-color: #11111b;
             border: 1px solid var(--border-color);
             border-radius: 4px;
             padding: 10px;
             font-family: monospace;
-            font-size: 0.85rem;
+            font-size: 0.82rem;
             white-space: pre-wrap;
             flex: 1;
+            min-height: 80px;
         }
         .radio-tile-group {
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            margin-top: 5px;
+            gap: 6px;
         }
         .radio-label {
             display: flex;
             align-items: center;
             gap: 10px;
             cursor: pointer;
-            padding: 8px;
+            padding: 7px;
             border-radius: 4px;
             border: 1px solid var(--border-color);
             background: #1e1e2e;
-            font-size: 0.9rem;
+            font-size: 0.88rem;
         }
         .radio-label:hover { border-color: var(--accent-color); }
         .radio-label input { margin: 0; cursor: pointer; }
         .color-indicator {
-            width: 14px;
-            height: 14px;
+            width: 14px; height: 14px;
             border-radius: 2px;
             display: inline-block;
             border: 1px solid #fff;
@@ -132,128 +151,41 @@
             color: var(--accent-color);
             text-align: center;
         }
-        .btn-group {
-            display: flex;
-            gap: 8px;
-        }
-        .btn-group button { flex: 1; }
-        .btn-import { background-color: #a855f7 !important; }
-        .btn-import:hover { background-color: #9333ea !important; }
-        .btn-export-dat { background-color: #f59e0b !important; }
-        .btn-export-dat:hover { background-color: #d97706 !important; }
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.75);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-        }
-        .modal-overlay.active { display: flex; }
-        .modal-box {
-            background: var(--panel-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 24px;
-            width: 760px;
-            max-width: 96vw;
-            max-height: 88vh;
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-        }
-        .modal-title {
-            font-size: 1.1rem;
-            font-weight: bold;
-            color: var(--accent-color);
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 10px;
-        }
-        .modal-tabs { display: flex; gap: 8px; }
-        .modal-tab {
-            padding: 6px 16px;
-            border-radius: 4px;
-            border: 1px solid var(--border-color);
-            background: #1e1e2e;
-            color: var(--text-color);
-            cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: bold;
-        }
-        .modal-tab.active { background: var(--accent-color); color: #11111b; border-color: var(--accent-color); }
-        .modal-pre {
-            flex: 1;
-            overflow: auto;
-            background: #11111b;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            padding: 12px;
-            font-family: 'Courier New', monospace;
-            font-size: 0.78rem;
-            white-space: pre;
-            min-height: 180px;
-            max-height: 48vh;
-        }
-        .modal-footer { display: flex; gap: 10px; justify-content: flex-end; }
-        .btn-cancel { background-color: #45475a !important; color: var(--text-color) !important; }
-        .btn-cancel:hover { background-color: #585b70 !important; }
-        .import-drop-zone {
+        #importFileInput { display: none; }
+        .drop-zone {
             border: 2px dashed var(--border-color);
             border-radius: 6px;
-            padding: 24px;
+            padding: 10px;
             text-align: center;
+            font-size: 0.82rem;
             color: #a6adc8;
             cursor: pointer;
             transition: border-color 0.2s, background 0.2s;
         }
-        .import-drop-zone:hover, .import-drop-zone.dragover {
-            border-color: var(--accent-color);
-            background: rgba(0,212,255,0.05);
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: #a855f7;
+            background: rgba(168,85,247,0.08);
         }
-        .import-drop-zone input[type=file] { display: none; }
-        .import-info {
-            font-size: 0.82rem;
-            color: #a6adc8;
-            background: #11111b;
-            border-radius: 4px;
-            padding: 10px 14px;
-            font-family: monospace;
-            white-space: pre-wrap;
-            max-height: 120px;
-            overflow-y: auto;
-        }
-        /* hex colour tokens */
-        .hx-addr { color: #6c7086; }
-        .hx-pass { color: #a6e3a1; font-weight: bold; }
-        .hx-fail { color: #f38ba8; font-weight: bold; }
-        .hx-skip { color: #585b70; }
-        .hx-tail { color: #fab387; }
-        .hx-foot { color: #cba6f7; }
-        .hx-term { color: #f9e2af; font-weight: bold; }
-        /* human-readable lines */
-        .hr-pass { color: #a6e3a1; }
-        .hr-fail { color: #f38ba8; }
-        .hr-info { color: #89dceb; }
-        .hr-tail { color: #fab387; }
-        .hr-foot { color: #cba6f7; }
     </style>
 </head>
 <body>
 
 <header>
-    <h1>Prober MAP Editor v4.0</h1>
+    <h1>Prober MAP Editor v4.0 (匯入/匯出機台格式)</h1>
     <div id="statusText">系統就緒</div>
 </header>
 
 <div class="main-container">
     <div class="panel">
+
+        <!-- ── 機台設定 ── -->
+        <div class="section-title">機台設定</div>
+
         <div class="form-group">
             <label>探針台型號 (Model Type)</label>
             <select id="modelType" onchange="changeModel()">
-                <option value="UF2000_ULLD">UF2000 / ULLD-HT (Pass=0x40)</option>
-                <option value="UF200_LLD">UF200 / M-LLD (Pass=0x50)</option>
+                <option value="UF2000_ULLD">UF2000 / ULLD (51,968 bytes)</option>
+                <option value="UF200_LLD">UF200 / M-LLD (38,400 bytes)</option>
             </select>
         </div>
 
@@ -262,38 +194,46 @@
             <input type="number" id="flatAngle" value="180" min="0" max="270" step="90" onchange="changeAngle()">
         </div>
 
-        <div class="form-group">
-            <label>滑鼠點擊編輯模式 (Edit Mode)</label>
-            <div class="radio-tile-group">
-                <label class="radio-label">
-                    <input type="radio" name="editMode" value="pass" checked>
-                    <span class="color-indicator" style="background-color: var(--pass-color);"></span>
-                    <span id="passLabel">🟩 良品 (ULLD=0x40 / M-LLD=0x50)</span>
-                </label>
-                <label class="radio-label">
-                    <input type="radio" name="editMode" value="fail">
-                    <span class="color-indicator" style="background-color: var(--fail-color);"></span>
-                    <span>🟥 標記不良品 (Fail 0x02)</span>
-                </label>
-                <label class="radio-label">
-                    <input type="radio" name="editMode" value="skip">
-                    <span class="color-indicator" style="background-color: #2d3142; border-color: #546e8a;"></span>
-                    <span>⬛ 不測試 (Skip 0x00)</span>
-                </label>
-            </div>
+        <!-- ── 編輯模式 ── -->
+        <div class="section-title">點擊編輯模式</div>
+
+        <div class="radio-tile-group">
+            <label class="radio-label">
+                <input type="radio" name="editMode" value="pass" checked>
+                <span class="color-indicator" style="background-color: var(--pass-color);"></span>
+                <span>🟩 良品 / 要測試 (0x40)</span>
+            </label>
+            <label class="radio-label">
+                <input type="radio" name="editMode" value="fail">
+                <span class="color-indicator" style="background-color: var(--fail-color);"></span>
+                <span>🟥 不良品 / 要測試 (0x01)</span>
+            </label>
+            <label class="radio-label">
+                <input type="radio" name="editMode" value="skip">
+                <span class="color-indicator" style="background-color: #2d3142; border-color: #546e8a;"></span>
+                <span>⬛ 不測試 Skip (0x00)</span>
+            </label>
         </div>
 
-        <div class="btn-group">
-            <button class="btn-import" onclick="openImportModal()">📂 匯入 .zip</button>
-            <button onclick="resetMap()">↺ 重設地圖</button>
-        </div>
-        <div class="btn-group">
-            <button class="btn-export-dat" onclick="openExportDatModal()">📄 匯出 dieData.dat</button>
-            <button onclick="exportProductZip()">📦 匯出產品包 .zip</button>
-        </div>
+        <!-- ── 匯入 ── -->
+        <div class="section-title">匯入機台資料</div>
 
-        <label style="margin-top:10px;">系統狀態與統計</label>
+        <div class="drop-zone" id="dropZone" onclick="document.getElementById('importFileInput').click()">
+            📂 拖曳或點擊選取機台 .zip 檔案<br>
+            <small style="color:#666">(含 dieData.dat 的 zip 包)</small>
+        </div>
+        <input type="file" id="importFileInput" accept=".zip" onchange="importZip(this.files[0])">
+
+        <!-- ── 操作按鈕 ── -->
+        <div class="section-title">操作</div>
+
+        <button onclick="resetMap()">重設地圖 (Reset Map)</button>
+        <button onclick="exportProductZip()">⬇ 匯出機台格式 zip</button>
+
+        <!-- ── 統計 ── -->
+        <div class="section-title">系統狀態與統計</div>
         <div id="infoBox" class="info-box"></div>
+
     </div>
 
     <div class="canvas-container">
@@ -302,66 +242,55 @@
 </div>
 
 <script>
-// ══════════════════════════════════════════════════════════════════
-// 機台 Profile 定義
-// ──────────────────────────────────────────────────────────────────
-// dieData.dat 使用稀疏 4-byte 列表格式：[0x00, row, status, col]
-// Pass code: ULLD=0x40, M-LLD=0x50
-// FlatAngle 在 devParm offset 30（兩種機台相同）
-// ══════════════════════════════════════════════════════════════════
-
+// ── 機台 Profile ─────────────────────────────────────────
 const PROFILES = {
-    // passCode: dieData 中 Pass 狀態碼
-    // edgeCode: 邊緣 die 狀態碼
-    // modelName: devParm 前 16 bytes 型號字串
-    // devParmSize: devParm.dat 完整大小
-    UF2000_ULLD: {
-        passCode:    0x40,
-        edgeCode:    0x80,
-        modelName:   "M-ULLD-ENG7-HT  ",   // 16 chars, padded with spaces
-        devParmSize: 154490,
-        devListSize:   8804,
-    },
-    UF200_LLD: {
-        passCode:    0x50,
-        edgeCode:    0x70,
-        modelName:   "M-LLD-50A-CP1-8I",   // 16 chars
-        devParmSize:  14443,
-        devListSize:   3692,
-    }
+    UF200_LLD:   { dataSize: 38400, videoSize: 38400, camFlag: 0x02, paddingByte: 0x50, passCode: 0x50 },
+    UF2000_ULLD: { dataSize: 51968, videoSize: 51968, camFlag: 0x04, paddingByte: 0x50, passCode: 0x40 }
 };
 
-// ── devParm 已知欄位 offset（兩種機台相同佈局）─────────────────────
-// Offset  0-15 : 型號字串 (ASCII, 16 bytes)
-// Offset 16-17 : uint16 = 0x003c (固定)
-// Offset 18-19 : uint16 = 0x0000
-// Offset 20-23 : uint32 DieRowSize (nm)
-// Offset 24-27 : uint32 DieColSize (nm)
-// Offset 28-29 : uint16 = 0x0001
-// Offset 30-31 : uint16 FlatAngle (degrees) ← 兩種機台都在 offset 30
-// Offset 32+   : 其餘參數（由 devList 控管，保留原始機台資料）
-const DEVPARM_FLATANGLE_OFFSET = 30;  // FlatAngle uint16 BE offset
+// ── 機台 dieData.dat 格式常數 ─────────────────────────────
+// 稀疏格式: [0x00, row, status, col]
+// Status codes: 0x40=ULLD pass, 0x50=M-LLD pass, 0x02=edge ring, 0x80=ULLD inner edge, 0x00=skip
+const MACHINE_PASS_ULLD = 0x40;
+const MACHINE_PASS_LLD  = 0x50;
+const MACHINE_EDGE      = 0x02;
+const MACHINE_EDGE2     = 0x80;
 
-// 機台預設 DieSize (nm)
-const DIE_SIZES = {
-    UF2000_ULLD: { rowSize: 480000, colSize: 520000 },
-    UF200_LLD:   { rowSize: 471000, colSize: 471000 }
+// 機台座標偏移預設值（若匯入則從 footer 覆寫）
+const COORD_OFFSET = {
+    UF2000_ULLD: { rMin: 3, cMin: 5, rMax: 34, cMax: 31 },
+    UF200_LLD:   { rMin: 4, cMin: 4, rMax: 35, cMax: 35 }
 };
 
-// ── 核心組態 ────────────────────────────────────────────────────
-let config = {
-    modelType: 'UF2000_ULLD',
-    rows: 32,
-    cols: 32,
-    flatAngle: 180
+// ── devParm.dat Schema（修正版）────────────────────────────
+// 兩種機台的 FlatAngle 實際都在 offset 30
+const PARAM_SCHEMA = {
+    UF200_LLD: [
+        { id: 1, name: "DieRowSize",  type: "uint32", offset: 12, default: 4500 },
+        { id: 2, name: "DieColSize",  type: "uint32", offset: 16, default: 4500 },
+        { id: 3, name: "FlatAngle",   type: "uint16", offset: 30, default: 180  },
+        { id: 4, name: "PassBinCode", type: "uint8",  offset: 32, default: 80   },  // M-LLD: 0x50=80
+        { id: 5, name: "FailBinCode", type: "uint8",  offset: 33, default: 1    }
+    ],
+    UF2000_ULLD: [
+        { id: 1, name: "DieRowSize",  type: "uint32", offset: 24, default: 4500 },
+        { id: 2, name: "DieColSize",  type: "uint32", offset: 28, default: 4500 },
+        { id: 3, name: "FlatAngle",   type: "uint16", offset: 30, default: 180  },  // 修正: 30 不是 42
+        { id: 4, name: "PassBinCode", type: "uint8",  offset: 44, default: 64   },  // ULLD: 0x40=64
+        { id: 5, name: "FailBinCode", type: "uint8",  offset: 45, default: 1    }
+    ]
 };
 
+// ── 核心狀態 ─────────────────────────────────────────────
+let config = { modelType: 'UF2000_ULLD', rows: 32, cols: 32, flatAngle: 180 };
+// 機台座標（匯入時從 footer 讀取，匯出時原樣寫回）
+let machineCoord = { ...COORD_OFFSET['UF2000_ULLD'] };
 let mapGrid = [];
 const cellSize = 14;
-const canvas = document.getElementById('mapCanvas');
-const ctx = canvas.getContext('2d');
+const canvas  = document.getElementById('mapCanvas');
+const ctx     = canvas.getContext('2d');
 
-// ── 晶圓初始化演算法 (6吋圓形收斂) ──────────────────────────────
+// ── 晶圓初始化 (6吋圓形) ────────────────────────────────
 function initMapGrid() {
     mapGrid = [];
     const Cx = (config.cols - 1) / 2;
@@ -373,17 +302,16 @@ function initMapGrid() {
         let rowData = [];
         for (let c = 0; c < config.cols; c++) {
             let dist = Math.sqrt(Math.pow(c - Cx, 2) + Math.pow(r - Cy, 2));
-            let status = 'skip';
-            if (dist <= (r_wafer - edge_thickness)) {
-                status = 'active';
-            }
-            rowData.push({ status, fail: false });
+            rowData.push({
+                status: dist <= (r_wafer - edge_thickness) ? 'active' : 'skip',
+                fail: false
+            });
         }
         mapGrid.push(rowData);
     }
 }
 
-// ── 畫布繪製 ────────────────────────────────────────────────────
+// ── 畫布繪製 ─────────────────────────────────────────────
 function drawMap() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     for (let r = 0; r < config.rows; r++) {
@@ -392,495 +320,296 @@ function drawMap() {
             if (cell.status === 'skip') {
                 ctx.fillStyle = '#11111b';
             } else {
-                ctx.fillStyle = cell.fail ? 'rgba(255, 23, 68, 0.9)' : 'rgba(0, 230, 118, 0.9)';
+                ctx.fillStyle = cell.fail ? 'rgba(255,23,68,0.9)' : 'rgba(0,230,118,0.9)';
             }
             ctx.fillRect(c * cellSize, r * cellSize, cellSize - 1, cellSize - 1);
         }
     }
 }
 
-// ── 滑鼠點擊編輯 ────────────────────────────────────────────────
+// ── 滑鼠點擊 ─────────────────────────────────────────────
 canvas.addEventListener('click', function(e) {
     const rect = canvas.getBoundingClientRect();
     const c = Math.floor((e.clientX - rect.left) / cellSize);
-    const r = Math.floor((e.clientY - rect.top) / cellSize);
+    const r = Math.floor((e.clientY - rect.top)  / cellSize);
 
     if (r >= 0 && r < config.rows && c >= 0 && c < config.cols) {
         const mode = document.querySelector('input[name="editMode"]:checked').value;
         let cell = mapGrid[r][c];
-
         if (mode === 'skip') {
-            cell.status = 'skip';
-            cell.fail = false;
+            cell.status = 'skip'; cell.fail = false;
         } else if (mode === 'fail') {
-            cell.status = 'active';
-            cell.fail = true;
+            cell.status = 'active'; cell.fail = true;
         } else {
-            cell.status = 'active';
-            cell.fail = false;
+            cell.status = 'active'; cell.fail = false;
         }
         drawMap();
         updateInfoBox();
     }
 });
 
-// ── UI 連動 ─────────────────────────────────────────────────────
+// ── UI 連動 ──────────────────────────────────────────────
 function changeModel() {
     config.modelType = document.getElementById('modelType').value;
-    const profile = PROFILES[config.modelType];
-    const passHex = profile.passCode.toString(16).toUpperCase();
-    document.getElementById('passLabel').textContent =
-        `🟩 良品 (Pass 0x${passHex})`;
+    machineCoord = { ...COORD_OFFSET[config.modelType] };
     updateInfoBox();
 }
-
 function changeAngle() {
     config.flatAngle = parseInt(document.getElementById('flatAngle').value) || 0;
     updateInfoBox();
 }
-
 function resetMap() {
     initMapGrid();
     drawMap();
     updateInfoBox();
-    document.getElementById('statusText').innerText = "地圖已重設";
+    setStatus('地圖已重設');
+}
+function setStatus(msg) {
+    document.getElementById('statusText').innerText = msg;
 }
 
 function updateInfoBox() {
-    let passCount = 0, failCount = 0, skipCount = 0;
+    let pass = 0, fail = 0, skip = 0;
     mapGrid.forEach(row => row.forEach(cell => {
-        if (cell.status === 'active') {
-            if (cell.fail) failCount++; else passCount++;
-        } else {
-            skipCount++;
-        }
+        if (cell.status === 'active') { cell.fail ? fail++ : pass++; }
+        else skip++;
     }));
-    const profile = PROFILES[config.modelType];
-    const passHex = profile.passCode.toString(16).toUpperCase().padStart(2,'0');
-    const info =
-        `【晶圓規格配置】\n` +
-        `探針台型號: ${config.modelType}\n` +
-        `Pass 狀態碼: 0x${passHex}\n` +
-        `矩陣大小: ${config.rows} x ${config.cols}\n` +
-        `平邊角度: ${config.flatAngle}°\n\n` +
-        `【目前晶粒統計】\n` +
-        `★總計測試 (Active): ${passCount + failCount} ea\n` +
-        `  └─ 良品 (Pass 0x${passHex}): ${passCount} ea\n` +
-        `  └─ 不良 (Fail 0x02): ${failCount} ea\n` +
-        `★總計不測 (Skip): ${skipCount} ea`;
-    document.getElementById('infoBox').innerText = info;
+    document.getElementById('infoBox').innerText =
+        `【配置】\n機台: ${config.modelType}\n` +
+        `矩陣: ${config.rows} × ${config.cols}\n` +
+        `平邊: ${config.flatAngle}°\n\n` +
+        `【統計】\n★ 測試中 (Active): ${pass + fail}\n` +
+        `  └ 良品 Pass (0x40): ${pass}\n` +
+        `  └ 不良 Fail (0x01): ${fail}\n` +
+        `★ 不測試 Skip: ${skip}`;
 }
 
-// ══════════════════════════════════════════════════════════════════
-// dieData.dat 產生器
-// 格式：稀疏 4-byte 列表 [0x00, row, status, col]
-//   - 只列出存在的 die（skip 不輸出）
-//   - row/col 使用 1-based 整數（canvas[r][c] → row=r+1, col=c+1）
-//   - Pass code: ULLD=0x40, M-LLD=0x50; Fail=0x02
-//   - 結尾附加固定 tail records、ff fd ff fd terminator、56-byte footer
-// ══════════════════════════════════════════════════════════════════
+// ── Checksum (16-bit 補碼) ───────────────────────────────
+function applyChecksum(buf) {
+    let dv  = new DataView(buf.buffer);
+    let sum = 0;
+    for (let i = 0; i < buf.length - 2; i++) sum += buf[i];
+    dv.setUint16(buf.length - 2, (0x10000 - (sum & 0xFFFF)) & 0xFFFF, false);
+}
+
+// ────────────────────────────────────────────────────────
+//  匯出：buildDieData  → 機台稀疏格式
+// ────────────────────────────────────────────────────────
 function buildDieData() {
-    const profile = PROFILES[config.modelType];
+    const profile  = PROFILES[config.modelType];
+    const mc       = machineCoord;          // ← 使用匯入時記住的座標（或預設值）
     const passCode = profile.passCode;
-    const failCode = 0x02;
 
-    const records = [];  // each: [row, status, col] (b0=0x00 implicit)
+    const records = [];
 
-    let minRow = 255, maxRow = 0, minCol = 255, maxCol = 0;
-
+    // ── 正常 die 記錄 ────────────────────────────────
     for (let r = 0; r < config.rows; r++) {
         for (let c = 0; c < config.cols; c++) {
-            const cell = mapGrid[r][c];
-            if (cell.status !== 'skip') {
-                const row = r + 1;   // 1-based
-                const col = c + 1;   // 1-based
-                const status = cell.fail ? failCode : passCode;
-                records.push([row, status, col]);
-                if (row < minRow) minRow = row;
-                if (row > maxRow) maxRow = row;
-                if (col < minCol) minCol = col;
-                if (col > maxCol) maxCol = col;
+            const cell    = mapGrid[r][c];
+            const machRow = r + mc.rMin;
+            const machCol = c + mc.cMin;
+            let statusByte;
+            if (cell.status === 'skip') {
+                statusByte = MACHINE_EDGE;   // 0x02 = edge/skip
+            } else {
+                statusByte = cell.fail ? 0x01 : passCode;
             }
+            records.push(0x00, machRow, statusByte, machCol);
         }
     }
 
-    if (records.length === 0) {
-        minRow = 1; maxRow = 1; minCol = 1; maxCol = 1;
-    }
+    // ── 後設資料記錄 ─────────────────────────────────
+    records.push(0x00, 0x02, 0x00, config.flatAngle & 0xFF);
+    records.push(0x00, config.flatAngle & 0xFF, 0x00, config.flatAngle & 0xFF);
+    records.push(0x00, 0x47, 0xB7, 0x60);
 
-    // 建構 tail records（固定錨點，機台解析需要）
-    //   5x [00 00 02 00]  – 行 0, 狀態 02, 列 0
-    //     [00 02 00 b4]  – row=2, skip, col=180
-    //     [00 b4 00 b4]  – row=180, skip, col=180
-    //     [00 47 b7 60]  – row=71, status=0xb7(center marker), col=96
-    //     [00 00 00 00] x2 – padding
-    const tail = [
-        [0x00, 0x02, 0x00],
-        [0x00, 0x02, 0x00],
-        [0x00, 0x02, 0x00],
-        [0x00, 0x02, 0x00],
-        [0x00, 0x02, 0x00],
-        [0x02, 0x00, 0xb4],
-        [0xb4, 0x00, 0xb4],
-        [0x47, 0xb7, 0x60],
-        [0x00, 0x00, 0x00],
-        [0x00, 0x00, 0x00],
+    // ── Footer (15 固定 records = 60 bytes) ──────────
+    const footer = [
+        0xFF, 0xFD, 0xFF, 0xFD,
+        0x00, 0x00, 0x00, 0x80,
+        0x00, 0x80, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x01,
+        0x00, 0x00, 0x00, 0x14,
+        0x00, 0x14, 0x00, 0x00,
+        0xFF, 0xFF, 0x00, 0x00,
+        0xFF, 0xFF, 0x00, 0x00,
+        0x00, 0x14, 0x00, 0x14,
+        0x00, 0x00, 0x00, 0x01,
+        0x00, mc.rMin, 0x00, mc.cMin,   // ← 匯入時的實際值
+        0x00, mc.rMax, 0x00, mc.cMax,   // ← 匯入時的實際值
+        0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00
     ];
 
-    const totalRecords = records.length + tail.length;
-    // terminator(4) + footer(56)
-    const bufSize = totalRecords * 4 + 4 + 56;
-    const buf = new Uint8Array(bufSize);
-    let offset = 0;
-
-    // 寫入 die records
-    for (const [row, status, col] of records) {
-        buf[offset++] = 0x00;
-        buf[offset++] = row;
-        buf[offset++] = status;
-        buf[offset++] = col;
-    }
-
-    // 寫入 tail records
-    for (const [row, status, col] of tail) {
-        buf[offset++] = 0x00;
-        buf[offset++] = row;
-        buf[offset++] = status;
-        buf[offset++] = col;
-    }
-
-    // 寫入 terminator
-    buf[offset++] = 0xff;
-    buf[offset++] = 0xfd;
-    buf[offset++] = 0xff;
-    buf[offset++] = 0xfd;
-
-    // 寫入 56-byte footer
-    // footer[0..1]:   0x0000
-    // footer[2..3]:   0x0080 = 128
-    // footer[4..5]:   0x0080 = 128
-    // footer[6..9]:   0x00000000
-    // footer[10..11]: 0x0001
-    // footer[12..13]: 0x0000
-    // footer[14..15]: 0x0014 = 20
-    // footer[16..17]: 0x0014 = 20
-    // footer[18..19]: 0x0000
-    // footer[20..27]: checksums (計算填入)
-    // footer[28..29]: 0x0014
-    // footer[30..31]: 0x0014
-    // footer[32..33]: 0x0000
-    // footer[34..35]: 0x0001
-    // footer[36..37]: minRow
-    // footer[38..39]: minCol
-    // footer[40..41]: maxRow
-    // footer[42..43]: maxCol
-    // footer[44..55]: 0x000...
-    const fBase = offset;
-    const dv = new DataView(buf.buffer);
-
-    dv.setUint16(fBase + 0,  0x0000, false);
-    dv.setUint16(fBase + 2,  0x0080, false);
-    dv.setUint16(fBase + 4,  0x0080, false);
-    dv.setUint16(fBase + 6,  0x0000, false);
-    dv.setUint16(fBase + 8,  0x0000, false);
-    dv.setUint16(fBase + 10, 0x0001, false);
-    dv.setUint16(fBase + 12, 0x0000, false);
-    dv.setUint16(fBase + 14, 0x0014, false);
-    dv.setUint16(fBase + 16, 0x0014, false);
-    dv.setUint16(fBase + 18, 0x0000, false);
-    // [20..27]: 填入 0（checksum 機台不強制驗證）
-    dv.setUint32(fBase + 20, 0x00000000, false);
-    dv.setUint32(fBase + 24, 0x00000000, false);
-    dv.setUint16(fBase + 28, 0x0014, false);
-    dv.setUint16(fBase + 30, 0x0014, false);
-    dv.setUint16(fBase + 32, 0x0000, false);
-    dv.setUint16(fBase + 34, 0x0001, false);
-    dv.setUint16(fBase + 36, minRow,  false);
-    dv.setUint16(fBase + 38, minCol,  false);
-    dv.setUint16(fBase + 40, maxRow,  false);
-    dv.setUint16(fBase + 42, maxCol,  false);
-    // [44..55]: zeros (already 0)
-
+    const buf = new Uint8Array(records.length + footer.length);
+    buf.set(records, 0);
+    buf.set(footer, records.length);
     return buf;
 }
 
-// ══════════════════════════════════════════════════════════════════
-// devParm.dat 產生器
-// 格式：與機台實際格式一致
-//   - 前 16 bytes: 型號字串
-//   - Offset 16-17: 0x003c
-//   - Offset 20-23: DieRowSize (uint32 BE, nm)
-//   - Offset 24-27: DieColSize (uint32 BE, nm)
-//   - Offset 28-29: 0x0001
-//   - Offset 30-31: FlatAngle (uint16 BE) ← 正確 offset（兩種機台相同）
-//   - 其餘 bytes: 以對應機台的預設值填入
-//   注意：前 8 bytes 不再填 0x11（會破壞型號字串）
-// ══════════════════════════════════════════════════════════════════
+// ────────────────────────────────────────────────────────
+//  匯出：buildDevParm（修正版）
+// ────────────────────────────────────────────────────────
 function buildDevParm() {
     const profile = PROFILES[config.modelType];
-    const sizes = DIE_SIZES[config.modelType];
-    const buf = new Uint8Array(profile.devParmSize);
-    const dv = new DataView(buf.buffer);
+    const buf = new Uint8Array(profile.dataSize);
+    const dv  = new DataView(buf.buffer);
+    const schema = PARAM_SCHEMA[config.modelType];
 
-    // 寫入型號字串（前 16 bytes）
-    const nameBytes = new TextEncoder().encode(profile.modelName.substring(0, 16).padEnd(16, ' '));
-    buf.set(nameBytes.subarray(0, 16), 0);
+    // 前 8 bytes fill 0x11（保留標頭，機台型號由機台本身維護）
+    buf.fill(0x11, 0, 8);
 
-    // Offset 16: 0x003c（固定）
-    dv.setUint16(16, 0x003c, false);
-    // Offset 18: 0x0000
-    dv.setUint16(18, 0x0000, false);
-    // Offset 20: DieRowSize (uint32 BE)
-    dv.setUint32(20, sizes.rowSize, false);
-    // Offset 24: DieColSize (uint32 BE)
-    dv.setUint32(24, sizes.colSize, false);
-    // Offset 28: 0x0001
-    dv.setUint16(28, 0x0001, false);
-    // Offset 30: FlatAngle ← 修正後正確 offset（非 42）
-    dv.setUint16(DEVPARM_FLATANGLE_OFFSET, config.flatAngle, false);
-    // Offset 32 以後：保持 0（機台讀取時以 devList 查詢所需欄位）
+    schema.forEach(p => {
+        let val = p.default;
+        if (p.name === 'FlatAngle')   val = config.flatAngle;
+        if (p.name === 'PassBinCode') val = profile.passCode;
 
+        if      (p.type === 'uint32') dv.setUint32(p.offset, val, false);
+        else if (p.type === 'uint16') dv.setUint16(p.offset, val, false);
+        else                          dv.setUint8 (p.offset, val);
+    });
+
+    applyChecksum(buf);
     return buf;
 }
 
-// ══════════════════════════════════════════════════════════════════
-// devList.dat 產生器
-// 格式：4-byte 記錄 [id_hi, id_lo, flags1, flags2]
-//   - 記錄 [0]: 標頭 [00 00, count_hi, count_lo]（記錄總數）
-//   - 後續：參數 ID 及其型別旗標
-// 機台實際 devList 有 922（M-LLD）到 2200（ULLD）筆記錄
-// 此處產生極簡版本（僅包含關鍵參數 ID）供機台識別
-// ══════════════════════════════════════════════════════════════════
+// ────────────────────────────────────────────────────────
+//  匯出：buildDevList（不變）
+// ────────────────────────────────────────────────────────
 function buildDevList() {
     const profile = PROFILES[config.modelType];
+    const buf = new Uint8Array(profile.dataSize);
+    const dv  = new DataView(buf.buffer);
+    const schema = PARAM_SCHEMA[config.modelType];
 
-    // 使用機台實際觀察到的標頭格式
-    // 4-byte records: [00 00 count_hi count_lo] header + N param entries
-    // 關鍵參數（從實際 devList 觀察）：
-    //   id=0x0001: flags=10 10 (特殊)
-    //   id=0x0002: flags=20 02 (uint16)
-    //   id=0x0003: flags=20 02
-    //   id=0x0004: flags=20 04 (uint32)
-    //   id=0x0005: flags=20 04
-    // 這裡只產生最小有效 devList
-    const paramEntries = [
-        [0x00, 0x01, 0x10, 0x10],
-        [0x00, 0x02, 0x20, 0x02],
-        [0x00, 0x03, 0x20, 0x02],
-        [0x00, 0x04, 0x20, 0x04],
-        [0x00, 0x05, 0x20, 0x04],
-    ];
+    schema.forEach((p, idx) => {
+        let off = 12 + idx * 32;
+        if (off + 32 > buf.length - 2) return;
+        dv.setUint32(off,     p.id,     false);
+        dv.setUint32(off + 4, p.offset, false);
+        let tc = (p.type === 'uint32') ? 0x04 : (p.type === 'uint16' ? 0x02 : 0x01);
+        dv.setUint8(off + 8, tc);
+    });
 
-    const count = paramEntries.length;
-    const bufSize = (1 + count) * 4;   // header + entries
-    const buf = new Uint8Array(bufSize);
-
-    // 標頭: [00 00 count_hi count_lo]
-    buf[0] = 0x00;
-    buf[1] = 0x00;
-    buf[2] = (count >> 8) & 0xff;
-    buf[3] = count & 0xff;
-
-    let offset = 4;
-    for (const entry of paramEntries) {
-        buf[offset++] = entry[0];
-        buf[offset++] = entry[1];
-        buf[offset++] = entry[2];
-        buf[offset++] = entry[3];
-    }
-
+    applyChecksum(buf);
     return buf;
 }
 
-// ── 下載與壓縮打包 ──────────────────────────────────────────────
-function exportProductZip() {
-    document.getElementById('statusText').innerText = "正在進行二進位打包...";
-    const zip = new JSZip();
-
-    try {
-        zip.file("dieData.dat", buildDieData());
-        zip.file("devParm.dat", buildDevParm());
-        zip.file("devList.dat", buildDevList());
-
-        zip.generateAsync({ type: "blob" }).then((content) => {
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(content);
-            a.download = `Product_${config.modelType}_${config.flatAngle}deg.zip`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            document.getElementById('statusText').innerText = "產品包下載完成！";
-        });
-    } catch(err) {
-        document.getElementById('statusText').innerText = "錯誤: " + err.message;
-        console.error(err);
-    }
+// ────────────────────────────────────────────────────────
+//  匯出：buildGenericData (videoData / opParm)
+// ────────────────────────────────────────────────────────
+function buildGenericData(fillByte) {
+    const profile = PROFILES[config.modelType];
+    const buf = new Uint8Array(profile.dataSize);
+    buf[0] = 0x33; buf[1] = 0x2E; buf[2] = 0x30; buf[3] = 0x30;
+    buf[11] = profile.camFlag;
+    buf.fill(fillByte, 12, buf.length - 2);
+    applyChecksum(buf);
+    return buf;
 }
 
-// ── 初始執行 ────────────────────────────────────────────────────
-window.onload = function() {
-    initMapGrid();
-    drawMap();
-    updateInfoBox();
-};
-</script>
+// ────────────────────────────────────────────────────────
+//  匯入：從機台 zip 讀取 dieData.dat
+// ────────────────────────────────────────────────────────
+function importZip(file) {
+    if (!file) return;
+    setStatus('正在讀取 zip…');
 
-<!-- ══ 匯入 Modal ══ -->
-<div class="modal-overlay" id="importModal">
-  <div class="modal-box">
-    <div class="modal-title">📂 匯入 Product ZIP / dieData.dat</div>
-    <div class="import-drop-zone" id="importDropZone" onclick="document.getElementById('importFileInput').click()">
-      <input type="file" id="importFileInput" accept=".zip,.dat" onchange="handleImportFile(event)">
-      <div style="font-size:2rem;">⬆️</div>
-      <div style="margin-top:6px;">點擊或拖放檔案到此處</div>
-      <div style="font-size:0.8rem;margin-top:4px;color:#6c7086;">支援 Product.zip（含 dieData.dat）或單一 dieData.dat</div>
-    </div>
-    <div id="importInfoBox" class="import-info" style="display:none;"></div>
-    <div class="modal-footer">
-      <button class="btn-cancel" onclick="closeImportModal()">取消</button>
-      <button id="btnDoImport" style="display:none;" onclick="applyImport()">✅ 套用至地圖</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ 匯出 dieData.dat 預覽 Modal ══ -->
-<div class="modal-overlay" id="exportDatModal">
-  <div class="modal-box">
-    <div class="modal-title">📄 dieData.dat 預覽與下載</div>
-    <div class="modal-tabs">
-      <button class="modal-tab active" id="tabHex"    onclick="switchDatTab('hex')">🔢 16 進位 (HEX)</button>
-      <button class="modal-tab"        id="tabHuman"  onclick="switchDatTab('human')">📖 人類可讀</button>
-    </div>
-    <div class="modal-pre" id="datPreviewPane"></div>
-    <div class="modal-footer">
-      <button class="btn-cancel" onclick="closeExportDatModal()">關閉</button>
-      <button onclick="downloadDieDataDat()">⬇️ 下載 dieData.dat</button>
-    </div>
-  </div>
-</div>
-
-<script>
-// ══════════════════════════════════════════════════════════════════
-// 匯入邏輯
-// ══════════════════════════════════════════════════════════════════
-let _importDieDataBuf = null;
-
-function openImportModal() {
-    _importDieDataBuf = null;
-    document.getElementById('importInfoBox').style.display = 'none';
-    document.getElementById('importInfoBox').innerHTML = '';
-    document.getElementById('btnDoImport').style.display = 'none';
-    document.getElementById('importFileInput').value = '';
-    document.getElementById('importModal').classList.add('active');
-}
-function closeImportModal() {
-    document.getElementById('importModal').classList.remove('active');
-    _importDieDataBuf = null;
-}
-
-// drag-and-drop
-const dropZone = document.getElementById('importDropZone');
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-dropZone.addEventListener('drop', e => {
-    e.preventDefault();
-    dropZone.classList.remove('dragover');
-    const file = e.dataTransfer.files[0];
-    if (file) processImportFile(file);
-});
-
-function handleImportFile(event) {
-    const file = event.target.files[0];
-    if (file) processImportFile(file);
-}
-
-async function processImportFile(file) {
-    const infoBox = document.getElementById('importInfoBox');
-    infoBox.style.display = 'block';
-    infoBox.textContent = '讀取中...';
-    try {
-        let datBuf = null;
-        if (file.name.toLowerCase().endsWith('.zip')) {
-            const zip = await JSZip.loadAsync(file);
-            // find dieData.dat (case-insensitive)
-            const entry = Object.keys(zip.files).find(k => k.toLowerCase() === 'diedata.dat');
-            if (!entry) throw new Error('ZIP 中找不到 dieData.dat');
-            datBuf = await zip.files[entry].async('uint8array');
-            infoBox.textContent = `ZIP 解壓成功，找到 dieData.dat (${datBuf.length} bytes)`;
-        } else if (file.name.toLowerCase().endsWith('.dat')) {
-            const ab = await file.arrayBuffer();
-            datBuf = new Uint8Array(ab);
-            infoBox.textContent = `直接讀取 dieData.dat (${datBuf.length} bytes)`;
-        } else {
-            throw new Error('不支援的檔案類型，請選擇 .zip 或 .dat');
+    JSZip.loadAsync(file).then(zip => {
+        const dieFile = zip.file('dieData.dat');
+        if (!dieFile) {
+            setStatus('❌ zip 內找不到 dieData.dat');
+            return;
         }
-        const parsed = parseDieData(datBuf);
-        _importDieDataBuf = datBuf;
-        infoBox.textContent +=
-            `\n\n解析結果：\n` +
-            `  良品 (Pass): ${parsed.passCount} ea\n` +
-            `  不良 (Fail): ${parsed.failCount} ea\n` +
-            `  Skip:        偵測到的 die 合計 ${parsed.passCount + parsed.failCount} ea\n` +
-            `  網格大小:    row 1~${parsed.maxRow}, col 1~${parsed.maxCol}\n` +
-            `  Pass 狀態碼: 0x${parsed.detectedPassCode.toString(16).toUpperCase().padStart(2,'0')}\n` +
-            `\n按「套用至地圖」將資料載入到編輯器。`;
-        document.getElementById('btnDoImport').style.display = 'inline-block';
-    } catch (err) {
-        infoBox.textContent = '⚠️ 錯誤：' + err.message;
-        document.getElementById('btnDoImport').style.display = 'none';
-    }
+
+        // 同時嘗試讀取 devParm.dat（可選）
+        const parmFile = zip.file('devParm.dat');
+
+        const promises = [
+            dieFile.async('uint8array'),
+            parmFile ? parmFile.async('uint8array') : Promise.resolve(null)
+        ];
+
+        Promise.all(promises).then(([dieBytes, parmBytes]) => {
+            try {
+                importDieData(dieBytes, parmBytes);
+                setStatus('✅ 匯入成功！');
+            } catch(e) {
+                setStatus('❌ 匯入失敗: ' + e.message);
+            }
+        });
+    }).catch(e => {
+        setStatus('❌ 無法開啟 zip: ' + e.message);
+    });
 }
 
-function parseDieData(buf) {
-    // format: [0x00, row, status, col] records until ff fd ff fd or EOF
-    let passCount = 0, failCount = 0;
-    let maxRow = 0, maxCol = 0;
-    let detectedPassCode = 0x40;
-    const records = [];
-    let i = 0;
-    while (i + 3 < buf.length) {
-        const b0 = buf[i], b1 = buf[i+1], b2 = buf[i+2], b3 = buf[i+3];
-        // terminator
-        if (b0 === 0xff && b1 === 0xfd && b2 === 0xff && b3 === 0xfd) break;
-        // skip non-standard leading byte
-        if (b0 !== 0x00) { i += 4; continue; }
-        const row = b1, status = b2, col = b3;
-        // skip tail/footer anchors: row=0 or col=0
-        if (row === 0 || col === 0) { i += 4; continue; }
-        records.push({ row, col, status });
-        if (row > maxRow) maxRow = row;
-        if (col > maxCol) maxCol = col;
-        if (status === 0x40) detectedPassCode = 0x40;
-        else if (status === 0x50) detectedPassCode = 0x50;
-        i += 4;
-    }
-    // count
-    for (const r of records) {
-        if (r.status === 0x02) failCount++;
-        else if (r.status !== 0x00) passCount++;
-    }
-    return { records, passCount, failCount, maxRow, maxCol, detectedPassCode };
-}
+// ────────────────────────────────────────────────────────
+//  匯入核心：解析機台 dieData.dat 稀疏格式
+// ────────────────────────────────────────────────────────
+function importDieData(bytes, parmBytes) {
+    const sz = bytes.length;
+    if (sz < 16) throw new Error('dieData.dat 過小');
 
-function applyImport() {
-    if (!_importDieDataBuf) return;
-    const parsed = parseDieData(_importDieDataBuf);
-    // determine grid size (at least 32x32, round up to multiple of 4)
-    const neededRows = Math.max(32, Math.ceil(parsed.maxRow / 4) * 4);
-    const neededCols = Math.max(32, Math.ceil(parsed.maxCol / 4) * 4);
-    config.rows = neededRows;
-    config.cols = neededCols;
+    // ── 1. 自動偵測機台型號 ──────────────────────────
+    let detectedModel = config.modelType;
+    if (parmBytes && parmBytes.length >= 16) {
+        let modelStr = '';
+        for (let i = 0; i < 16; i++) {
+            const ch = parmBytes[i];
+            if (ch >= 0x20 && ch < 0x7F) modelStr += String.fromCharCode(ch);
+        }
+        modelStr = modelStr.trim();
+        if (modelStr.includes('ULLD') || modelStr.includes('UF2')) {
+            detectedModel = 'UF2000_ULLD';
+        } else if (modelStr.includes('LLD') || modelStr.includes('M-L')) {
+            detectedModel = 'UF200_LLD';
+        }
+        document.getElementById('modelType').value = detectedModel;
+        config.modelType = detectedModel;
+    }
 
-    // detect model from pass code
-    if (parsed.detectedPassCode === 0x50) {
-        config.modelType = 'UF200_LLD';
-        document.getElementById('modelType').value = 'UF200_LLD';
+    // ── 2. 從 devParm.dat 讀取 FlatAngle ────────────
+    if (parmBytes) {
+        const dv = new DataView(parmBytes.buffer, parmBytes.byteOffset, parmBytes.byteLength);
+        const angle = dv.getUint16(30, false);
+        if (angle === 0 || angle === 90 || angle === 180 || angle === 270) {
+            config.flatAngle = angle;
+            document.getElementById('flatAngle').value = angle;
+        }
+    }
+
+    // ── 3. 找 footer 起始位置 ([FF FD FF FD]) ────────
+    let footerIdx = sz;
+    for (let i = 0; i < sz - 3; i += 4) {
+        if (bytes[i] === 0xFF && bytes[i+1] === 0xFD &&
+            bytes[i+2] === 0xFF && bytes[i+3] === 0xFD) {
+            footerIdx = i;
+            break;
+        }
+    }
+
+    // ── 4. 從 footer 讀取 rMin/cMin/rMax/cMax ────────
+    // footer 結構: 60 bytes (15 records × 4 bytes)
+    // offset +40: [00, rMin, 00, cMin]
+    // offset +44: [00, rMax, 00, cMax]
+    let rMin, cMin, rMax, cMax;
+    if (footerIdx + 48 <= sz) {
+        rMin = bytes[footerIdx + 41];
+        cMin = bytes[footerIdx + 43];
+        rMax = bytes[footerIdx + 45];
+        cMax = bytes[footerIdx + 47];
     } else {
-        config.modelType = 'UF2000_ULLD';
-        document.getElementById('modelType').value = 'UF2000_ULLD';
+        // footer 不完整，使用預設值
+        const def = COORD_OFFSET[detectedModel];
+        rMin = def.rMin; cMin = def.cMin;
+        rMax = def.rMax; cMax = def.cMax;
     }
 
-    // rebuild grid as all-skip first
+    // 記住機台座標，匯出時原樣寫回
+    machineCoord = { rMin, cMin, rMax, cMax };
+
+    // ── 5. 清空 grid ─────────────────────────────────
     mapGrid = [];
     for (let r = 0; r < config.rows; r++) {
         let row = [];
@@ -889,187 +618,92 @@ function applyImport() {
         }
         mapGrid.push(row);
     }
-    // fill in records (1-based → 0-based)
-    for (const rec of parsed.records) {
-        const r = rec.row - 1, c = rec.col - 1;
-        if (r < config.rows && c < config.cols) {
-            if (rec.status === 0x02) {
-                mapGrid[r][c] = { status: 'active', fail: true };
-            } else {
-                mapGrid[r][c] = { status: 'active', fail: false };
-            }
+
+    // ── 6. 解析稀疏記錄 ──────────────────────────────
+    let importedPass = 0, importedFail = 0, importedEdge = 0, outOfRange = 0;
+
+    for (let i = 0; i < footerIdx; i += 4) {
+        if (bytes[i] !== 0x00) continue;
+        const machRow = bytes[i + 1];
+        const statusB = bytes[i + 2];
+        const machCol = bytes[i + 3];
+
+        if (machRow < rMin || machRow > rMin + config.rows - 1) continue;
+        if (machCol < cMin || machCol > cMin + config.cols - 1) continue;
+
+        const gridR = machRow - rMin;
+        const gridC = machCol - cMin;
+
+        if (gridR < 0 || gridR >= config.rows || gridC < 0 || gridC >= config.cols) {
+            outOfRange++;
+            continue;
+        }
+
+        const cell = mapGrid[gridR][gridC];
+
+        if (statusB === 0x40 || statusB === 0x50) {
+            cell.status = 'active'; cell.fail = false;
+            importedPass++;
+        } else if (statusB === 0x01) {
+            cell.status = 'active'; cell.fail = true;
+            importedFail++;
+        } else if (statusB === 0x02 || statusB === 0x80) {
+            cell.status = 'skip';
+            importedEdge++;
         }
     }
-    changeModel();
+
     drawMap();
     updateInfoBox();
-    closeImportModal();
-    document.getElementById('statusText').innerText = `匯入完成：${parsed.passCount} 良品 / ${parsed.failCount} 不良`;
+
+    const existing = document.getElementById('infoBox').innerText;
+    document.getElementById('infoBox').innerText =
+        existing + `\n\n【匯入摘要】\n` +
+        `模型: ${detectedModel}\n` +
+        `座標: (${rMin},${cMin})..(${rMax},${cMax})\n` +
+        `Pass: ${importedPass}, Fail: ${importedFail}\n` +
+        `Edge: ${importedEdge}, 超範圍: ${outOfRange}`;
 }
 
-// ══════════════════════════════════════════════════════════════════
-// 匯出 dieData.dat 預覽
-// ══════════════════════════════════════════════════════════════════
-let _currentDatView = 'hex';
-let _cachedDatBuf = null;
+// ── Drag & Drop 支援 ─────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) importZip(file);
+});
 
-function openExportDatModal() {
-    _cachedDatBuf = buildDieData();
-    _currentDatView = 'hex';
-    document.getElementById('tabHex').classList.add('active');
-    document.getElementById('tabHuman').classList.remove('active');
-    renderDatPreview();
-    document.getElementById('exportDatModal').classList.add('active');
-}
-function closeExportDatModal() {
-    document.getElementById('exportDatModal').classList.remove('active');
-}
-function switchDatTab(mode) {
-    _currentDatView = mode;
-    document.getElementById('tabHex').classList.toggle('active', mode === 'hex');
-    document.getElementById('tabHuman').classList.toggle('active', mode === 'human');
-    renderDatPreview();
-}
+// ── 匯出 zip ─────────────────────────────────────────────
+function exportProductZip() {
+    setStatus('正在打包…');
+    const zip = new JSZip();
 
-function renderDatPreview() {
-    const pane = document.getElementById('datPreviewPane');
-    if (!_cachedDatBuf) return;
-    if (_currentDatView === 'hex') {
-        pane.innerHTML = renderHexView(_cachedDatBuf);
-    } else {
-        pane.innerHTML = renderHumanView(_cachedDatBuf);
-    }
-}
+    zip.file('dieData.dat',  buildDieData());
+    zip.file('devParm.dat',  buildDevParm());
+    zip.file('devList.dat',  buildDevList());
+    zip.file('videoData.dat', buildGenericData(0x40));
+    zip.file('opParm.dat',    buildGenericData(0x50));
 
-function renderHexView(buf) {
-    const profile = PROFILES[config.modelType];
-    const passCode = profile.passCode;
-    // find terminator position
-    let termPos = buf.length;
-    for (let i = 0; i + 3 < buf.length; i += 4) {
-        if (buf[i] === 0xff && buf[i+1] === 0xfd && buf[i+2] === 0xff && buf[i+3] === 0xfd) {
-            termPos = i; break;
-        }
-    }
-    const footerStart = termPos + 4;
-
-    let html = '';
-    const bytesPerRow = 16;
-    for (let i = 0; i < buf.length; i += bytesPerRow) {
-        const addr = i.toString(16).toUpperCase().padStart(6, '0');
-        html += `<span class="hx-addr">${addr}:</span> `;
-        let hex = '', ascii = '';
-        for (let j = 0; j < bytesPerRow; j++) {
-            const idx = i + j;
-            if (idx >= buf.length) { hex += '   '; ascii += ' '; continue; }
-            const byte = buf[idx];
-            const byteHex = byte.toString(16).toUpperCase().padStart(2, '0');
-            // classify
-            let cls = '';
-            if (idx >= footerStart) cls = 'hx-foot';
-            else if (idx === termPos || idx === termPos+1 || idx === termPos+2 || idx === termPos+3) cls = 'hx-term';
-            else {
-                // check if this is inside a tail record or die record
-                const recStart = Math.floor(idx / 4) * 4;
-                const b0 = buf[recStart], b1 = buf[recStart+1], b2 = buf[recStart+2], b3 = buf[recStart+3];
-                if (recStart < termPos) {
-                    if (b1 === 0 || b3 === 0) cls = 'hx-tail';
-                    else if (b2 === passCode) cls = 'hx-pass';
-                    else if (b2 === 0x02) cls = 'hx-fail';
-                    else cls = 'hx-tail';
-                }
-            }
-            hex += `<span class="${cls}">${byteHex}</span> `;
-            const ch = byte >= 0x20 && byte < 0x7f ? String.fromCharCode(byte) : '.';
-            ascii += ch;
-        }
-        html += hex + ` <span class="hx-addr">|${ascii}|</span>\n`;
-    }
-    return html;
+    zip.generateAsync({ type: 'blob' }).then(content => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(content);
+        a.download = `Product_${config.modelType}_${config.flatAngle}deg.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setStatus('✅ 匯出完成');
+    }).catch(e => setStatus('❌ ' + e.message));
 }
 
-function renderHumanView(buf) {
-    const profile = PROFILES[config.modelType];
-    const passCode = profile.passCode;
-    let html = '';
-    html += `<span class="hr-info">【dieData.dat 結構解析】</span>\n`;
-    html += `<span class="hr-info">  機台型號 : ${config.modelType}  Pass=0x${passCode.toString(16).toUpperCase()}</span>\n`;
-    html += `<span class="hr-info">  檔案大小 : ${buf.length} bytes</span>\n\n`;
-
-    let i = 0, recNo = 0;
-    let termPos = buf.length;
-    // find terminator
-    for (let k = 0; k + 3 < buf.length; k += 4) {
-        if (buf[k] === 0xff && buf[k+1] === 0xfd && buf[k+2] === 0xff && buf[k+3] === 0xfd) {
-            termPos = k; break;
-        }
-    }
-
-    html += `<span class="hr-info">━━ Die 記錄區 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>\n`;
-    html += `<span class="hr-info">  格式: [0x00, Row, Status, Col]  (1-based)</span>\n\n`;
-
-    while (i < termPos && i + 3 < buf.length) {
-        const b0 = buf[i], row = buf[i+1], status = buf[i+2], col = buf[i+3];
-        const hex = `${b0.toString(16).padStart(2,'0').toUpperCase()} ${row.toString(16).padStart(2,'0').toUpperCase()} ${status.toString(16).padStart(2,'0').toUpperCase()} ${col.toString(16).padStart(2,'0').toUpperCase()}`;
-        let desc = '', cls = '';
-        if (row === 0 || col === 0) {
-            desc = `Tail 錨點 (row=${row}, col=${col}, status=0x${status.toString(16).toUpperCase()})`;
-            cls = 'hr-tail';
-        } else if (status === passCode) {
-            recNo++;
-            desc = `Die #${String(recNo).padStart(4,' ')}  Row=${String(row).padStart(3,' ')} Col=${String(col).padStart(3,' ')}  🟩 良品  (0x${passCode.toString(16).toUpperCase()})`;
-            cls = 'hr-pass';
-        } else if (status === 0x02) {
-            recNo++;
-            desc = `Die #${String(recNo).padStart(4,' ')}  Row=${String(row).padStart(3,' ')} Col=${String(col).padStart(3,' ')}  🟥 不良品 (0x02)`;
-            cls = 'hr-fail';
-        } else {
-            desc = `Tail 錨點 (row=${row}, status=0x${status.toString(16).toUpperCase().padStart(2,'0')}, col=${col})`;
-            cls = 'hr-tail';
-        }
-        html += `<span class="${cls}">  [${hex}]  ${desc}</span>\n`;
-        i += 4;
-    }
-
-    // terminator
-    if (i === termPos) {
-        html += `\n<span class="hx-term">  [FF FD FF FD]  ── 終止符 (Terminator) ──</span>\n`;
-        i += 4;
-    }
-
-    // footer
-    if (i < buf.length) {
-        html += `\n<span class="hr-foot">━━ 56-byte Footer ━━━━━━━━━━━━━━━━━━━━━━━━</span>\n`;
-        const dv = new DataView(buf.buffer, i);
-        const fo = i;
-        const f = (off) => buf[fo+off] !== undefined ? buf[fo+off] : 0;
-        const u16 = (off) => (f(off) << 8) | f(off+1);
-        html += `<span class="hr-foot">  +00: 0x${u16(0).toString(16).padStart(4,'0').toUpperCase()}  固定 0x0000\n`;
-        html += `  +02: 0x${u16(2).toString(16).padStart(4,'0').toUpperCase()}  = ${u16(2)}  (0x0080=128)\n`;
-        html += `  +04: 0x${u16(4).toString(16).padStart(4,'0').toUpperCase()}  = ${u16(4)}  (0x0080=128)\n`;
-        html += `  +10: 0x${u16(10).toString(16).padStart(4,'0').toUpperCase()}  = ${u16(10)}  (0x0001)\n`;
-        html += `  +14: 0x${u16(14).toString(16).padStart(4,'0').toUpperCase()}  = ${u16(14)}  (0x0014=20)\n`;
-        html += `  +16: 0x${u16(16).toString(16).padStart(4,'0').toUpperCase()}  = ${u16(16)}  (0x0014=20)\n`;
-        html += `  +36: minRow = ${u16(36)}\n`;
-        html += `  +38: minCol = ${u16(38)}\n`;
-        html += `  +40: maxRow = ${u16(40)}\n`;
-        html += `  +42: maxCol = ${u16(42)}</span>\n`;
-    }
-
-    return html;
-}
-
-function downloadDieDataDat() {
-    if (!_cachedDatBuf) return;
-    const blob = new Blob([_cachedDatBuf], { type: 'application/octet-stream' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `dieData_${config.modelType}_${config.flatAngle}deg.dat`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    document.getElementById('statusText').innerText = 'dieData.dat 下載完成！';
-}
+// ── 初始化 ────────────────────────────────────────────────
+window.onload = function() {
+    initMapGrid();
+    drawMap();
+    updateInfoBox();
+};
 </script>
 
 </body>
